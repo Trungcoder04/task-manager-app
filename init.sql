@@ -1,20 +1,31 @@
+-- 1. Tao co so du lieu 
 CREATE DATABASE IF NOT EXISTS TaskManagerDB
 CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 USE TaskManagerDB;
 
+-- 2. Xoa cac bang cu (Xoa tu bang con den bang cha de khong loi khoa ngoai)
+DROP TABLE IF EXISTS TaskActivities;
+DROP TABLE IF EXISTS TaskComments;
+DROP TABLE IF EXISTS TaskAttachments;
+DROP TABLE IF EXISTS TaskLabels;
+DROP TABLE IF EXISTS Labels;
+DROP TABLE IF EXISTS Tasks;
+DROP TABLE IF EXISTS ProjectMembers;
+DROP TABLE IF EXISTS Projects;
+DROP TABLE IF EXISTS Users;
 
---  Tạo bảng Users
+-- 3. Tao bang Users (Nguoi dung)
 CREATE TABLE Users (
     Id INT AUTO_INCREMENT PRIMARY KEY,
     Username VARCHAR(50) NOT NULL UNIQUE,
-    Password VARCHAR(255) NOT NULL, 
+    Password VARCHAR(255) NOT NULL,
     FullName VARCHAR(100) NOT NULL,
     Email VARCHAR(100) UNIQUE,
     CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
---  Tạo bảng Projects
+-- 4. Tao bang Projects (Du an)
 CREATE TABLE Projects (
     Id INT AUTO_INCREMENT PRIMARY KEY,
     Name VARCHAR(255) NOT NULL,
@@ -24,7 +35,7 @@ CREATE TABLE Projects (
     FOREIGN KEY (OwnerId) REFERENCES Users(Id) ON DELETE CASCADE
 );
 
---  Tạo bảng ProjectMembers (N-N giữa Users và Projects)
+-- 5. Tao bang ProjectMembers (Thanh vien du an)
 CREATE TABLE ProjectMembers (
     ProjectId INT NOT NULL,
     UserId INT NOT NULL,
@@ -35,7 +46,7 @@ CREATE TABLE ProjectMembers (
     FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
 
---  Tạo bảng Tasks
+-- 6. Tao bang Tasks (Cong viec)
 CREATE TABLE Tasks (
     Id INT AUTO_INCREMENT PRIMARY KEY,
     ProjectId INT NOT NULL,
@@ -49,4 +60,56 @@ CREATE TABLE Tasks (
     CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (ProjectId) REFERENCES Projects(Id) ON DELETE CASCADE,
     FOREIGN KEY (AssigneeId) REFERENCES Users(Id) ON DELETE SET NULL
+);
+
+-- 7. Tao bang Labels (Danh sach nhan dan cua du an)
+CREATE TABLE Labels (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    ProjectId INT NOT NULL,
+    Name VARCHAR(100) NOT NULL,
+    ColorCode VARCHAR(20),
+    FOREIGN KEY (ProjectId) REFERENCES Projects(Id) ON DELETE CASCADE
+);
+
+-- 8. Tao bang TaskLabels (Gan nhan cho task)
+CREATE TABLE TaskLabels (
+    TaskId INT NOT NULL,
+    LabelId INT NOT NULL,
+    PRIMARY KEY (TaskId, LabelId),
+    FOREIGN KEY (TaskId) REFERENCES Tasks(Id) ON DELETE CASCADE,
+    FOREIGN KEY (LabelId) REFERENCES Labels(Id) ON DELETE CASCADE
+);
+
+-- 9. Tao bang TaskAttachments (File dinh kem)
+CREATE TABLE TaskAttachments (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    TaskId INT NOT NULL,
+    UploaderId INT NOT NULL,
+    FileName VARCHAR(255) NOT NULL,
+    FileUrl TEXT NOT NULL,
+    UploadedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (TaskId) REFERENCES Tasks(Id) ON DELETE CASCADE,
+    FOREIGN KEY (UploaderId) REFERENCES Users(Id) ON DELETE CASCADE
+);
+
+-- 10. Tao bang TaskComments (Binh luan)
+CREATE TABLE TaskComments (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    TaskId INT NOT NULL,
+    UserId INT NOT NULL,
+    Content TEXT NOT NULL,
+    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (TaskId) REFERENCES Tasks(Id) ON DELETE CASCADE,
+    FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE CASCADE
+);
+
+-- 11. Tao bang TaskActivities (Lich su thao tac)
+CREATE TABLE TaskActivities (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    TaskId INT NOT NULL,
+    UserId INT NOT NULL,
+    Action VARCHAR(255) NOT NULL,
+    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (TaskId) REFERENCES Tasks(Id) ON DELETE CASCADE,
+    FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE CASCADE
 );
