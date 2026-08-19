@@ -1,0 +1,52 @@
+CREATE DATABASE IF NOT EXISTS TaskManagerDB
+CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+USE TaskManagerDB;
+
+
+--  Tạo bảng Users
+CREATE TABLE Users (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    Username VARCHAR(50) NOT NULL UNIQUE,
+    Password VARCHAR(255) NOT NULL, 
+    FullName VARCHAR(100) NOT NULL,
+    Email VARCHAR(100) UNIQUE,
+    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+--  Tạo bảng Projects
+CREATE TABLE Projects (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    Name VARCHAR(255) NOT NULL,
+    Description TEXT,
+    OwnerId INT NOT NULL,
+    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (OwnerId) REFERENCES Users(Id) ON DELETE CASCADE
+);
+
+--  Tạo bảng ProjectMembers (N-N giữa Users và Projects)
+CREATE TABLE ProjectMembers (
+    ProjectId INT NOT NULL,
+    UserId INT NOT NULL,
+    Role INT NOT NULL DEFAULT 2 COMMENT '1: Admin, 2: Member',
+    JoinedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (ProjectId, UserId),
+    FOREIGN KEY (ProjectId) REFERENCES Projects(Id) ON DELETE CASCADE,
+    FOREIGN KEY (UserId) REFERENCES Users(Id) ON DELETE CASCADE
+);
+
+--  Tạo bảng Tasks
+CREATE TABLE Tasks (
+    Id INT AUTO_INCREMENT PRIMARY KEY,
+    ProjectId INT NOT NULL,
+    Title VARCHAR(255) NOT NULL,
+    Description TEXT,
+    Status INT NOT NULL DEFAULT 1 COMMENT '1: Todo, 2: Doing, 3: Done',
+    Priority INT NOT NULL DEFAULT 2 COMMENT '1: Low, 2: Medium, 3: High',
+    DueDate DATETIME,
+    AssigneeId INT,
+    OrderIndex FLOAT NOT NULL DEFAULT 0,
+    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (ProjectId) REFERENCES Projects(Id) ON DELETE CASCADE,
+    FOREIGN KEY (AssigneeId) REFERENCES Users(Id) ON DELETE SET NULL
+);
