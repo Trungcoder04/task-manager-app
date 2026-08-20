@@ -51,6 +51,7 @@ export const AppLayout: React.FC = () => {
     deleteTask,
     addComment,
     addAttachment,
+    uploadAttachment,
     deleteAttachment,
     createLabel,
     deleteLabel,
@@ -114,6 +115,7 @@ export const AppLayout: React.FC = () => {
               onDeleteTask={deleteTask}
               onAddComment={addComment}
               onAddAttachment={addAttachment}
+              onUploadAttachment={uploadAttachment}
               onDeleteAttachment={deleteAttachment}
               onCreateLabel={createLabel}
               onDeleteLabel={deleteLabel}
@@ -176,6 +178,7 @@ export const AppLayout: React.FC = () => {
           onDeleteTask={deleteTask}
           onAddComment={addComment}
           onAddAttachment={addAttachment}
+          onUploadAttachment={uploadAttachment}
           onDeleteAttachment={deleteAttachment}
         />
       )}

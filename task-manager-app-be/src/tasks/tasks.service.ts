@@ -7,36 +7,11 @@ import { TaskResponse } from './dto/task-response.dto';
 import { AppException } from '../common/errors/app.exception';
 import { ErrorCode } from '../common/errors/error-code.enum';
 
-const taskInclude = {
-  assignee: {
-    select: {
-      id: true,
-      username: true,
-      fullName: true,
-      email: true,
-    },
-  },
-  taskLabels: {
-    include: {
-      label: true,
-    },
-  },
-};
-
-function formatTaskResponse(task: any): TaskResponse {
-  if (!task) return task;
-  const { taskLabels, ...rest } = task;
-  return {
-    ...rest,
-    labels: taskLabels ? taskLabels.map((tl: any) => tl.label).filter(Boolean) : [],
-  };
-}
-
 @Injectable()
 export class TasksService {
   private readonly logger = new Logger(TasksService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   /**
    * Kiểm tra một User có thuộc Project hay không (là Owner hoặc là Member)
@@ -114,7 +89,7 @@ export class TasksService {
   }
 
   /**
-   * Tạo mới Task (Có lưu nhãn dán TaskLabel vào MySQL)
+   * Tạo mới Task (Có kiểm tra ràng buộc Assignee phải thuộc Project)
    */
   async createTask(
     currentUserId: number,
@@ -128,7 +103,7 @@ export class TasksService {
     const validAssigneeId = await this.getValidAssigneeId(dto.assigneeId);
 
     try {
-      const newTask = await this.prisma.task.create({
+      const created = await this.prisma.task.create({
         data: {
           projectId: dto.projectId,
           title: dto.title,
@@ -144,9 +119,28 @@ export class TasksService {
             },
           }),
         },
-        include: taskInclude,
+        include: {
+          assignee: {
+            select: {
+              id: true,
+              username: true,
+              fullName: true,
+              email: true,
+              avatar: true,
+            },
+          },
+          taskLabels: {
+            include: {
+              label: true,
+            },
+          },
+        },
       });
-      return formatTaskResponse(newTask);
+
+      return {
+        ...created,
+        labels: created.taskLabels?.map((tl) => tl.label) ?? [],
+      };
     } catch (err) {
       this.logger.error('Error creating task in DB:', err);
       throw err;
@@ -154,7 +148,7 @@ export class TasksService {
   }
 
   /**
-   * Lấy danh sách Task theo Project (Có include Labels từ MySQL)
+   * Lấy danh sách Task theo Project (Có filter & tìm kiếm)
    */
   async getProjectTasks(
     projectId: number,
@@ -181,9 +175,67 @@ export class TasksService {
     const tasks = await this.prisma.task.findMany({
       where: whereCondition,
       orderBy: [{ orderIndex: 'asc' }, { createdAt: 'desc' }],
-      include: taskInclude,
+      include: {
+        assignee: {
+          select: {
+            id: true,
+            username: true,
+            fullName: true,
+            email: true,
+            avatar: true,
+          },
+        },
+        taskLabels: {
+          include: {
+            label: true,
+          },
+        },
+        comments: {
+          orderBy: { createdAt: 'asc' },
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                fullName: true,
+                avatar: true,
+              },
+            },
+          },
+        },
+        attachments: {
+          orderBy: { uploadedAt: 'desc' },
+          include: {
+            uploader: {
+              select: {
+                id: true,
+                username: true,
+                fullName: true,
+                avatar: true,
+              },
+            },
+          },
+        },
+        activities: {
+          orderBy: { createdAt: 'desc' },
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                fullName: true,
+                avatar: true,
+              },
+            },
+          },
+        },
+      },
     });
-    return tasks.map(formatTaskResponse);
+
+    return tasks.map((task) => ({
+      ...task,
+      labels: task.taskLabels?.map((tl) => tl.label) ?? [],
+    }));
   }
 
   /**
@@ -195,7 +247,61 @@ export class TasksService {
   ): Promise<TaskResponse> {
     const task = await this.prisma.task.findUnique({
       where: { id: taskId },
-      include: taskInclude,
+      include: {
+        assignee: {
+          select: {
+            id: true,
+            username: true,
+            fullName: true,
+            email: true,
+            avatar: true,
+          },
+        },
+        taskLabels: {
+          include: {
+            label: true,
+          },
+        },
+        comments: {
+          orderBy: { createdAt: 'asc' },
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                fullName: true,
+                avatar: true,
+              },
+            },
+          },
+        },
+        attachments: {
+          orderBy: { uploadedAt: 'desc' },
+          include: {
+            uploader: {
+              select: {
+                id: true,
+                username: true,
+                fullName: true,
+                avatar: true,
+              },
+            },
+          },
+        },
+        activities: {
+          orderBy: { createdAt: 'desc' },
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                fullName: true,
+                avatar: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!task) {
@@ -207,11 +313,160 @@ export class TasksService {
       throw new AppException(ErrorCode.NOT_PROJECT_MEMBER);
     }
 
-    return formatTaskResponse(task);
+    return {
+      ...task,
+      labels: task.taskLabels?.map((tl) => tl.label) ?? [],
+    };
   }
 
   /**
-   * Cập nhật Task (Cập nhật cả danh sách Nhãn TaskLabel)
+   * Lấy danh sách lịch sử hoạt động (activities) của Task
+   */
+  async getTaskActivities(
+    taskId: number,
+    currentUserId: number,
+  ) {
+    const task = await this.prisma.task.findUnique({
+      where: { id: taskId },
+      select: { projectId: true },
+    });
+
+    if (!task) {
+      throw new AppException(ErrorCode.TASK_NOT_FOUND);
+    }
+
+    const isMember = await this.isUserInProject(task.projectId, currentUserId);
+    if (!isMember) {
+      throw new AppException(ErrorCode.NOT_PROJECT_MEMBER);
+    }
+
+    return this.prisma.taskActivity.findMany({
+      where: { taskId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            fullName: true,
+            avatar: true,
+          },
+        },
+      },
+    });
+  }
+
+  /**
+   * Lấy danh sách bình luận (comments) của Task
+   */
+  async getTaskComments(
+    taskId: number,
+    currentUserId: number,
+  ) {
+    const task = await this.prisma.task.findUnique({
+      where: { id: taskId },
+      select: { projectId: true },
+    });
+
+    if (!task) {
+      throw new AppException(ErrorCode.TASK_NOT_FOUND);
+    }
+
+    const isMember = await this.isUserInProject(task.projectId, currentUserId);
+    if (!isMember) {
+      throw new AppException(ErrorCode.NOT_PROJECT_MEMBER);
+    }
+
+    return this.prisma.taskComment.findMany({
+      where: { taskId },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            fullName: true,
+            avatar: true,
+          },
+        },
+      },
+    });
+  }
+
+  /**
+   * Thêm bình luận mới vào Task
+   */
+  async addTaskComment(
+    taskId: number,
+    currentUserId: number,
+    content: string,
+  ) {
+    if (!content || !content.trim()) {
+      throw new AppException(ErrorCode.INVALID_KEY);
+    }
+
+    const task = await this.prisma.task.findUnique({
+      where: { id: taskId },
+      select: { projectId: true },
+    });
+
+    if (!task) {
+      throw new AppException(ErrorCode.TASK_NOT_FOUND);
+    }
+
+    const isMember = await this.isUserInProject(task.projectId, currentUserId);
+    if (!isMember) {
+      throw new AppException(ErrorCode.NOT_PROJECT_MEMBER);
+    }
+
+    return this.prisma.taskComment.create({
+      data: {
+        taskId,
+        userId: currentUserId,
+        content: content.trim(),
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            fullName: true,
+            avatar: true,
+          },
+        },
+      },
+    });
+  }
+
+  /**
+   * Xóa bình luận
+   */
+  async deleteTaskComment(
+    taskId: number,
+    commentId: number,
+    currentUserId: number,
+  ) {
+    const comment = await this.prisma.taskComment.findUnique({
+      where: { id: commentId },
+    });
+
+    if (!comment || comment.taskId !== taskId) {
+      throw new AppException(ErrorCode.TASK_NOT_FOUND);
+    }
+
+    if (comment.userId !== currentUserId) {
+      throw new AppException(ErrorCode.UNAUTHORIZED);
+    }
+
+    await this.prisma.taskComment.delete({
+      where: { id: commentId },
+    });
+
+    return { message: 'Bình luận đã được xóa thành công' };
+  }
+
+  /**
+   * Cập nhật Task
    */
   async updateTask(
     taskId: number,
@@ -239,21 +494,24 @@ export class TasksService {
         ? await this.getValidAssigneeId(dto.assigneeId)
         : undefined;
 
+    // Cập nhật nhãn dán trong CSDL nếu có gửi labelIds
     if (dto.labelIds !== undefined) {
       await this.prisma.taskLabel.deleteMany({
         where: { taskId },
       });
+
       if (dto.labelIds.length > 0) {
         await this.prisma.taskLabel.createMany({
           data: dto.labelIds.map((labelId) => ({ taskId, labelId })),
+          skipDuplicates: true,
         });
       }
     }
 
-    const updatedTask = await this.prisma.task.update({
+    await this.prisma.task.update({
       where: { id: taskId },
       data: {
-        ...(dto.title !== undefined && { title: dto.title }),
+        ...(dto.title !== undefined && { title: dto.title.trim() }),
         ...(dto.description !== undefined && { description: dto.description }),
         ...(dto.status !== undefined && { status: dto.status }),
         ...(dto.priority !== undefined && { priority: dto.priority }),
@@ -263,10 +521,9 @@ export class TasksService {
         ...(validAssigneeId !== undefined && { assigneeId: validAssigneeId }),
         ...(dto.orderIndex !== undefined && { orderIndex: dto.orderIndex }),
       },
-      include: taskInclude,
     });
 
-    return formatTaskResponse(updatedTask);
+    return this.getTaskById(taskId, currentUserId);
   }
 
   /**

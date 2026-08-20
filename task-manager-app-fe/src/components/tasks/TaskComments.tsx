@@ -1,30 +1,70 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { TaskComment } from '../../types/comment.types';
+import { taskCommentService } from '../../services/taskCommentService';
 import { Avatar } from '../common/Avatar';
 import { Button } from '../common/Button';
+import { LoadingSpinner } from '../common/LoadingSpinner';
 
 interface TaskCommentsProps {
-  comments: TaskComment[];
-  onAddComment: (content: string) => Promise<void>;
+  taskId?: number;
+  comments?: TaskComment[];
+  onAddComment?: (content: string) => Promise<unknown>;
+  onCountChange?: (count: number) => void;
 }
 
 export const TaskComments: React.FC<TaskCommentsProps> = ({
-  comments,
+  taskId,
+  comments: initialComments,
   onAddComment,
+  onCountChange,
 }) => {
+  const [comments, setComments] = useState<TaskComment[]>(initialComments || []);
   const [content, setContent] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const fetchComments = useCallback(async () => {
+    if (!taskId) return;
+    setIsFetching(true);
+    try {
+      const data = await taskCommentService.getComments(taskId);
+      setComments(data);
+      onCountChange?.(data.length);
+    } catch (err) {
+      console.warn('Lỗi khi tải bình luận:', err);
+    } finally {
+      setIsFetching(false);
+    }
+  }, [taskId, onCountChange]);
+
+  useEffect(() => {
+    if (taskId) {
+      void fetchComments();
+    } else if (initialComments) {
+      setComments(initialComments);
+      onCountChange?.(initialComments.length);
+    }
+  }, [taskId, fetchComments, initialComments, onCountChange]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!content.trim()) return;
 
-    setIsLoading(true);
+    setIsSubmitting(true);
     try {
-      await onAddComment(content.trim());
+      if (onAddComment) {
+        await onAddComment(content.trim());
+      } else if (taskId) {
+        const newCmt = await taskCommentService.addComment(taskId, content.trim());
+        setComments((prev) => {
+          const updated = [...prev, newCmt];
+          onCountChange?.(updated.length);
+          return updated;
+        });
+      }
       setContent('');
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -40,6 +80,7 @@ export const TaskComments: React.FC<TaskCommentsProps> = ({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      {/* Form viết bình luận */}
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         <textarea
           className="form-textarea"
@@ -47,60 +88,67 @@ export const TaskComments: React.FC<TaskCommentsProps> = ({
           placeholder="Viết bình luận hoặc trao đổi tiến độ..."
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          disabled={isLoading}
+          disabled={isSubmitting}
         />
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <Button
             type="submit"
             variant="primary"
             size="sm"
-            disabled={!content.trim() || isLoading}
-            isLoading={isLoading}
+            disabled={!content.trim() || isSubmitting}
+            isLoading={isSubmitting}
           >
             Gửi bình luận
           </Button>
         </div>
       </form>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        {comments.length === 0 ? (
-          <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-            Chưa có bình luận nào. Hãy bắt đầu cuộc trò chuyện!
-          </div>
-        ) : (
-          comments.map((cmt) => (
+      {/* Danh sách bình luận */}
+      {isFetching ? (
+        <div style={{ padding: '2rem 0' }}>
+          <LoadingSpinner text="Đang tải bình luận..." />
+        </div>
+      ) : comments.length === 0 ? (
+        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+          Chưa có bình luận nào. Hãy bắt đầu cuộc trao đổi!
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          {comments.map((cmt) => (
             <div
               key={cmt.id}
               style={{
                 display: 'flex',
                 gap: '0.75rem',
-                padding: '0.875rem',
-                background: 'var(--bg-surface-secondary)',
+                padding: '0.875rem 1rem',
+                backgroundColor: 'var(--bg-surface)',
                 borderRadius: 'var(--radius-lg)',
+                border: '1px solid var(--border-color)',
+                boxShadow: 'var(--shadow-sm)',
               }}
             >
               <Avatar
-                name={cmt.user?.fullName || 'User'}
-                src={cmt.user?.avatarUrl}
+                name={cmt.user?.fullName || cmt.user?.username || 'User'}
+                src={cmt.user?.avatar || cmt.user?.avatarUrl}
                 size="sm"
               />
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                  <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                    {cmt.user?.fullName || 'User'}
+                  <span style={{ fontSize: '0.845rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    {cmt.user?.fullName || cmt.user?.username || 'User'}
                   </span>
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                     {formatTime(cmt.createdAt)}
                   </span>
                 </div>
-                <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>
+                <p style={{ fontSize: '0.845rem', color: 'var(--text-secondary)', lineHeight: 1.45, whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: 0 }}>
                   {cmt.content}
                 </p>
               </div>
             </div>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

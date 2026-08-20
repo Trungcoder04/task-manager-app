@@ -8,6 +8,7 @@ import {
 import { Label, CreateLabelRequest } from '../types/label.types';
 import { TaskComment } from '../types/comment.types';
 import { TaskAttachment } from '../types/attachment.types';
+import { TaskActivity } from '../types/activity.types';
 import { INITIAL_TASKS, INITIAL_LABELS, INITIAL_USERS } from './mockData';
 import { apiClient } from './apiClient';
 import { ApiResponse } from '../types/api.types';

@@ -31,6 +31,7 @@ interface BoardPageProps {
   onDeleteTask: (id: number) => Promise<void>;
   onAddComment: (taskId: number, content: string) => Promise<unknown>;
   onAddAttachment: (taskId: number, fileName: string, fileUrl: string) => Promise<unknown>;
+  onUploadAttachment?: (taskId: number, file: File) => Promise<unknown>;
   onDeleteAttachment: (attachmentId: number, taskId: number) => Promise<void>;
   onCreateLabel: (data: CreateLabelRequest) => Promise<unknown>;
   onDeleteLabel: (labelId: number) => Promise<void>;
@@ -53,6 +54,7 @@ export const BoardPage: React.FC<BoardPageProps> = ({
   onDeleteTask,
   onAddComment,
   onAddAttachment,
+  onUploadAttachment,
   onDeleteAttachment,
   onCreateLabel,
   onDeleteLabel,
@@ -154,6 +156,7 @@ export const BoardPage: React.FC<BoardPageProps> = ({
         onDeleteTask={onDeleteTask}
         onAddComment={onAddComment}
         onAddAttachment={onAddAttachment}
+        onUploadAttachment={onUploadAttachment}
         onDeleteAttachment={onDeleteAttachment}
       />
 

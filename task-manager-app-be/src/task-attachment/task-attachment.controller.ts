@@ -12,6 +12,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { TaskAttachmentService } from './task-attachment.service';
 import { TaskAttachmentResponse } from './dto/task-attachment-response.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { TaskActivity } from '../common/task-activity';
 
 @Controller('task-attachments')
 export class TaskAttachmentController {
@@ -21,6 +22,10 @@ export class TaskAttachmentController {
 
     @Post('upload/:taskId')
     @UseInterceptors(FileInterceptor('file'))
+    @TaskActivity({
+        action: (req) => `Tải lên tệp đính kèm: ${req.file?.originalname || 'tệp mới'}`,
+        taskId: (req) => Number(req.params.taskId),
+    })
     async uploadAttachment(
         @Param('taskId', ParseIntPipe) taskId: number,
         @UploadedFile() file: Express.Multer.File,

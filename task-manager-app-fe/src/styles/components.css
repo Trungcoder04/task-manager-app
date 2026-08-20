@@ -284,11 +284,11 @@
   background: var(--bg-surface);
   border-left: 1px solid var(--border-color);
   width: 100%;
-  max-width: 680px;
+  max-width: 840px;
   height: 100%;
   display: flex;
   flex-direction: column;
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-xl);
   animation: slideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 

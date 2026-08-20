@@ -54,7 +54,10 @@ export class TaskActivityInterceptor implements NestInterceptor {
     result: any,
     options: TaskActivityOptions,
   ) {
-    const userId = request.user?.id;
+    const userId =
+      request.user?.id ||
+      (request.user as any)?.userId ||
+      (request.user as any)?.sub;
     if (!userId) {
       this.logger.warn(
         'Cannot log task activity: User is not authenticated in request',
