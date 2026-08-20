@@ -36,6 +36,11 @@ export interface Task {
   comments?: TaskComment[];
   attachments?: TaskAttachment[];
   activities?: TaskActivity[];
+  _count?: {
+    comments?: number;
+    attachments?: number;
+    activities?: number;
+  };
 }
 
 export interface CreateTaskRequest {

@@ -21,6 +21,7 @@ interface TaskModalProps {
   onDeleteTask: (id: number) => Promise<void>;
   onAddComment: (taskId: number, content: string) => Promise<unknown>;
   onAddAttachment: (taskId: number, fileName: string, fileUrl: string) => Promise<unknown>;
+  onUploadAttachment?: (taskId: number, file: File) => Promise<unknown>;
   onDeleteAttachment: (attachmentId: number, taskId: number) => Promise<void>;
 }
 
@@ -37,6 +38,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   onDeleteTask,
   onAddComment,
   onAddAttachment,
+  onUploadAttachment,
   onDeleteAttachment,
 }) => {
   const [title, setTitle] = useState('');
@@ -73,13 +75,40 @@ export const TaskModal: React.FC<TaskModalProps> = ({
 
   const isEditing = !!task;
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!title.trim()) return;
 
-    setIsLoading(true);
-    try {
-      if (isEditing && task) {
+    if (isEditing && task) {
+      const originalDueDate = task.dueDate ? task.dueDate.split('T')[0] : '';
+      const originalAssigneeId = task.assigneeId || '';
+      const originalLabelIds = (task.labels || []).map((l) => l.id).sort().join(',');
+      const currentLabelIds = [...selectedLabelIds].sort().join(',');
+
+      const hasTitleChanged = title.trim() !== task.title;
+      const hasDescChanged = (description.trim() || '') !== (task.description || '');
+      const hasStatusChanged = status !== task.status;
+      const hasPriorityChanged = priority !== task.priority;
+      const hasDueDateChanged = (dueDate || '') !== originalDueDate;
+      const hasAssigneeChanged = (assigneeId || '') !== originalAssigneeId;
+      const hasLabelsChanged = originalLabelIds !== currentLabelIds;
+
+      // Nếu không có bất kỳ thay đổi nào -> đóng modal ngay, không gọi API!
+      if (
+        !hasTitleChanged &&
+        !hasDescChanged &&
+        !hasStatusChanged &&
+        !hasPriorityChanged &&
+        !hasDueDateChanged &&
+        !hasAssigneeChanged &&
+        !hasLabelsChanged
+      ) {
+        onClose();
+        return;
+      }
+
+      setIsLoading(true);
+      try {
         await onUpdateTask(task.id, {
           title: title.trim(),
           description: description.trim() || undefined,
@@ -89,7 +118,13 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           assigneeId: assigneeId ? Number(assigneeId) : null,
           labelIds: selectedLabelIds,
         });
-      } else {
+        onClose();
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      setIsLoading(true);
+      try {
         await onCreateTask({
           projectId,
           title: title.trim(),
@@ -100,10 +135,10 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           assigneeId: assigneeId ? Number(assigneeId) : undefined,
           labelIds: selectedLabelIds,
         });
+        onClose();
+      } finally {
+        setIsLoading(false);
       }
-      onClose();
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -122,17 +157,40 @@ export const TaskModal: React.FC<TaskModalProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '1.25rem 1.5rem',
+            padding: '1rem 1.5rem',
             borderBottom: '1px solid var(--border-color)',
+            backgroundColor: 'var(--bg-surface)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <span style={{ fontSize: '1.125rem', fontWeight: 800 }}>
-              {isEditing ? `Chi tiết Công việc #${task.id}` : 'Tạo Công việc Mới'}
+            <span
+              style={{
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                padding: '0.2rem 0.5rem',
+                borderRadius: 'var(--radius-sm)',
+                backgroundColor: isEditing ? 'rgba(99, 102, 241, 0.12)' : 'rgba(16, 185, 129, 0.12)',
+                color: isEditing ? 'var(--primary-500)' : '#10b981',
+              }}
+            >
+              {isEditing ? `#${task.id}` : 'MỚI'}
             </span>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
+              {isEditing ? 'Chi tiết công việc' : 'Tạo công việc mới'}
+            </h3>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Button
+              variant="primary"
+              size="sm"
+              icon="check"
+              onClick={() => void handleSave()}
+              isLoading={isLoading}
+            >
+              {isEditing ? 'Lưu thay đổi' : 'Tạo công việc'}
+            </Button>
+
             {isEditing && task && (
               <Button
                 variant="danger"
@@ -147,37 +205,75 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                 title="Xóa công việc"
               />
             )}
-            <button className="btn btn-ghost btn-icon" onClick={onClose} aria-label="Close">
+
+            <button className="btn btn-ghost btn-icon" onClick={onClose} aria-label="Close" title="Đóng">
               <Icon name="x" size={18} />
             </button>
           </div>
         </div>
 
-        {/* Form Body */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        {/* Scrollable Body */}
+        <div
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '1.25rem 1.5rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1.25rem',
+          }}
+        >
+          {/* Top Form: Compact & Clean Layout */}
+          <form
+            onSubmit={handleSave}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.875rem',
+              backgroundColor: 'var(--bg-surface-secondary)',
+              padding: '1rem 1.25rem',
+              borderRadius: 'var(--radius-lg)',
+              border: '1px solid var(--border-color)',
+            }}
+          >
+            {/* Title */}
             <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">Tiêu đề công việc</label>
               <input
                 type="text"
                 className="form-input"
-                placeholder="Ví dụ: Implement Login API"
+                placeholder="Tiêu đề công việc..."
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
                 disabled={isLoading}
+                style={{
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                  backgroundColor: 'var(--bg-surface)',
+                  padding: '0.625rem 0.875rem',
+                }}
               />
             </div>
 
-            {/* Grid 2 Columns for Metadata */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            {/* 4 Metadata Fields in Compact Grid */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                gap: '0.75rem',
+              }}
+            >
+              {/* Trạng thái */}
               <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">Trạng thái</label>
+                <label className="form-label" style={{ fontSize: '0.75rem', marginBottom: '0.25rem', color: 'var(--text-muted)' }}>
+                  Trạng thái
+                </label>
                 <select
                   className="form-select"
                   value={status}
                   onChange={(e) => setStatus(Number(e.target.value) as TaskStatusType)}
                   disabled={isLoading}
+                  style={{ fontSize: '0.8125rem', padding: '0.45rem 0.65rem' }}
                 >
                   <option value={1}>TODO</option>
                   <option value={2}>DOING</option>
@@ -185,13 +281,17 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                 </select>
               </div>
 
+              {/* Độ ưu tiên */}
               <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">Độ ưu tiên</label>
+                <label className="form-label" style={{ fontSize: '0.75rem', marginBottom: '0.25rem', color: 'var(--text-muted)' }}>
+                  Độ ưu tiên
+                </label>
                 <select
                   className="form-select"
                   value={priority}
                   onChange={(e) => setPriority(Number(e.target.value) as TaskPriorityType)}
                   disabled={isLoading}
+                  style={{ fontSize: '0.8125rem', padding: '0.45rem 0.65rem' }}
                 >
                   <option value={3}>🔴 Cao (High)</option>
                   <option value={2}>🟡 Trung bình (Medium)</option>
@@ -199,13 +299,17 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                 </select>
               </div>
 
+              {/* Người thực hiện */}
               <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">Người thực hiện</label>
+                <label className="form-label" style={{ fontSize: '0.75rem', marginBottom: '0.25rem', color: 'var(--text-muted)' }}>
+                  Người thực hiện
+                </label>
                 <select
                   className="form-select"
                   value={assigneeId}
                   onChange={(e) => setAssigneeId(e.target.value ? Number(e.target.value) : '')}
                   disabled={isLoading}
+                  style={{ fontSize: '0.8125rem', padding: '0.45rem 0.65rem' }}
                 >
                   <option value="">-- Chưa chỉ định --</option>
                   {members.map((m) => (
@@ -216,24 +320,45 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                 </select>
               </div>
 
+              {/* Hạn chót */}
               <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">Hạn chót (Due Date)</label>
+                <label className="form-label" style={{ fontSize: '0.75rem', marginBottom: '0.25rem', color: 'var(--text-muted)' }}>
+                  Hạn chót
+                </label>
                 <input
                   type="date"
                   className="form-input"
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
                   disabled={isLoading}
+                  style={{ fontSize: '0.8125rem', padding: '0.45rem 0.65rem' }}
                 />
               </div>
             </div>
 
-            {/* Label selection */}
-            <div>
-              <label className="form-label" style={{ display: 'block', marginBottom: '0.5rem' }}>
-                Nhãn dán (Labels)
-              </label>
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {/* Description */}
+            <div className="form-group" style={{ margin: 0 }}>
+              <textarea
+                className="form-textarea"
+                rows={2}
+                placeholder="Thêm mô tả công việc, yêu cầu kỹ thuật hoặc ghi chú ngắn..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                disabled={isLoading}
+                style={{
+                  fontSize: '0.845rem',
+                  padding: '0.5rem 0.75rem',
+                  resize: 'vertical',
+                }}
+              />
+            </div>
+
+            {/* Labels Row */}
+            {labels.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', paddingTop: '0.25rem' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                  Nhãn:
+                </span>
                 {labels.map((lbl) => {
                   const isSelected = selectedLabelIds.includes(lbl.id);
                   return (
@@ -247,6 +372,10 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                         color: isSelected ? 'white' : lbl.colorCode || '#6366f1',
                         border: `1px solid ${lbl.colorCode || '#6366f1'}`,
                         cursor: 'pointer',
+                        padding: '0.15rem 0.5rem',
+                        fontSize: '0.75rem',
+                        borderRadius: '999px',
+                        transition: 'all 0.15s ease',
                       }}
                     >
                       {lbl.name}
@@ -254,84 +383,125 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                   );
                 })}
               </div>
-            </div>
-
-            <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">Mô tả chi tiết</label>
-              <textarea
-                className="form-textarea"
-                rows={4}
-                placeholder="Thêm mô tả công việc, các yêu cầu kỹ thuật hoặc ghi chú..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                disabled={isLoading}
-              />
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
-              <Button type="button" variant="secondary" onClick={onClose} disabled={isLoading}>
-                Hủy
-              </Button>
-              <Button type="submit" variant="primary" isLoading={isLoading}>
-                {isEditing ? 'Lưu thay đổi' : 'Tạo công việc'}
-              </Button>
-            </div>
+            )}
           </form>
 
-          {/* If Editing, Show Tabs for Comments, Attachments & History */}
+          {/* Bottom Tabs: Comments, Attachments & History */}
           {isEditing && task && (
-            <div style={{ marginTop: '1.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1.25rem' }}>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '1rem',
+                backgroundColor: 'var(--bg-surface)',
+                borderRadius: 'var(--radius-lg)',
+                border: '1px solid var(--border-color)',
+                padding: '1.25rem',
+                boxShadow: 'var(--shadow-sm)',
+              }}
+            >
               {/* Tab Navigation */}
-              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem' }}>
-                <Button
-                  variant={activeTab === 'comments' ? 'primary' : 'ghost'}
-                  size="sm"
-                  icon="message-square"
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '0.5rem',
+                  borderBottom: '1px solid var(--border-color)',
+                  paddingBottom: '0.75rem',
+                }}
+              >
+                <button
+                  type="button"
+                  className={`btn btn-sm ${activeTab === 'comments' ? 'btn-primary' : 'btn-ghost'}`}
                   onClick={() => setActiveTab('comments')}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
                 >
-                  Bình luận ({task.comments?.length || 0})
-                </Button>
-                <Button
-                  variant={activeTab === 'attachments' ? 'primary' : 'ghost'}
-                  size="sm"
-                  icon="paperclip"
+                  <Icon name="message-square" size={15} />
+                  <span>Bình luận</span>
+                  <span
+                    style={{
+                      fontSize: '0.75rem',
+                      padding: '0.1rem 0.45rem',
+                      borderRadius: '999px',
+                      backgroundColor: activeTab === 'comments' ? 'rgba(255,255,255,0.25)' : 'var(--bg-surface-secondary)',
+                    }}
+                  >
+                    {task._count?.comments ?? task.comments?.length ?? 0}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`btn btn-sm ${activeTab === 'attachments' ? 'btn-primary' : 'btn-ghost'}`}
                   onClick={() => setActiveTab('attachments')}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
                 >
-                  Tập tin ({task.attachments?.length || 0})
-                </Button>
-                <Button
-                  variant={activeTab === 'activities' ? 'primary' : 'ghost'}
-                  size="sm"
-                  icon="clock"
+                  <Icon name="paperclip" size={15} />
+                  <span>Tập tin</span>
+                  <span
+                    style={{
+                      fontSize: '0.75rem',
+                      padding: '0.1rem 0.45rem',
+                      borderRadius: '999px',
+                      backgroundColor: activeTab === 'attachments' ? 'rgba(255,255,255,0.25)' : 'var(--bg-surface-secondary)',
+                    }}
+                  >
+                    {task._count?.attachments ?? task.attachments?.length ?? 0}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`btn btn-sm ${activeTab === 'activities' ? 'btn-primary' : 'btn-ghost'}`}
                   onClick={() => setActiveTab('activities')}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
                 >
-                  Lịch sử ({task.activities?.length || 0})
-                </Button>
+                  <Icon name="clock" size={15} />
+                  <span>Lịch sử</span>
+                  <span
+                    style={{
+                      fontSize: '0.75rem',
+                      padding: '0.1rem 0.45rem',
+                      borderRadius: '999px',
+                      backgroundColor: activeTab === 'activities' ? 'rgba(255,255,255,0.25)' : 'var(--bg-surface-secondary)',
+                    }}
+                  >
+                    {task._count?.activities ?? task.activities?.length ?? 0}
+                  </span>
+                </button>
               </div>
 
               {/* Tab Content */}
-              {activeTab === 'comments' && (
-                <TaskComments
-                  comments={task.comments || []}
-                  onAddComment={async (content) => {
-                    await onAddComment(task.id, content);
-                  }}
-                />
-              )}
+              <div>
+                {activeTab === 'comments' && (
+                  <TaskComments
+                    taskId={task.id}
+                    comments={task.comments}
+                    onAddComment={async (content) => {
+                      await onAddComment(task.id, content);
+                    }}
+                  />
+                )}
 
-              {activeTab === 'attachments' && (
-                <TaskAttachments
-                  attachments={task.attachments || []}
-                  onAddAttachment={async (fn, fu) => {
-                    await onAddAttachment(task.id, fn, fu);
-                  }}
-                  onDeleteAttachment={(attId) => onDeleteAttachment(attId, task.id)}
-                />
-              )}
+                {activeTab === 'attachments' && (
+                  <TaskAttachments
+                    taskId={task.id}
+                    attachments={task.attachments || []}
+                    onUploadFile={async (file) => {
+                      if (onUploadAttachment) {
+                        await onUploadAttachment(task.id, file);
+                      }
+                    }}
+                    onAddAttachment={async (fn, fu) => {
+                      await onAddAttachment(task.id, fn, fu);
+                    }}
+                    onDeleteAttachment={(attId) => onDeleteAttachment(attId, task.id)}
+                  />
+                )}
 
-              {activeTab === 'activities' && (
-                <TaskActivities activities={task.activities || []} />
-              )}
+                {activeTab === 'activities' && (
+                  <TaskActivities taskId={task.id} />
+                )}
+              </div>
             </div>
           )}
         </div>

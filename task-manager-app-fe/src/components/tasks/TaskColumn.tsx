@@ -42,7 +42,13 @@ export const TaskColumn: React.FC<TaskColumnProps> = ({
     setIsDragOver(false);
     const taskIdStr = e.dataTransfer.getData('text/plain');
     if (taskIdStr) {
-      onDropTask(Number(taskIdStr), status);
+      const taskId = Number(taskIdStr);
+      // Nếu task đã ở trong cột này thì không cần kích hoạt drop
+      const taskAlreadyInColumn = tasks.find((t) => t.id === taskId);
+      if (taskAlreadyInColumn && taskAlreadyInColumn.status === status) {
+        return;
+      }
+      onDropTask(taskId, status);
     }
   };
 

@@ -8,6 +8,7 @@ import {
 } from '../types/task.types';
 import { Label, CreateLabelRequest } from '../types/label.types';
 import { taskService } from '../services/taskService';
+import { taskAttachmentService } from '../services/taskAttachmentService';
 import { useToast } from './useToast';
 
 export const useTasks = (projectId?: number, currentUserId?: number) => {
@@ -115,6 +116,12 @@ export const useTasks = (projectId?: number, currentUserId?: number) => {
   };
 
   const moveTaskStatus = async (taskId: number, newStatus: TaskStatusType) => {
+    const currentTask = tasks.find((t) => t.id === taskId);
+    // Nếu trạng thái không thay đổi -> không cần gọi API
+    if (currentTask && currentTask.status === newStatus) {
+      return;
+    }
+
     // Optimistic update for fluid drag and drop
     const prevTasks = [...tasks];
     setTasks((prev) =>
@@ -164,7 +171,7 @@ export const useTasks = (projectId?: number, currentUserId?: number) => {
 
   const addAttachment = async (taskId: number, fileName: string, fileUrl: string) => {
     try {
-      const newAttachment = await taskService.addAttachment(
+      const newAttachment = await taskAttachmentService.addAttachment(
         taskId,
         currentUserId || 1,
         fileName,
@@ -188,7 +195,7 @@ export const useTasks = (projectId?: number, currentUserId?: number) => {
 
   const deleteAttachment = async (attachmentId: number, taskId: number) => {
     try {
-      await taskService.deleteAttachment(attachmentId, taskId);
+      await taskAttachmentService.deleteAttachment(attachmentId, taskId);
       setTasks((prev) =>
         prev.map((t) =>
           t.id === taskId
@@ -200,6 +207,25 @@ export const useTasks = (projectId?: number, currentUserId?: number) => {
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Xóa file thất bại';
       showToast(msg, 'error');
+    }
+  };
+
+  const uploadAttachment = async (taskId: number, file: File) => {
+    try {
+      const newAttachment = await taskAttachmentService.uploadAttachment(taskId, file);
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === taskId
+            ? { ...t, attachments: [...(t.attachments || []), newAttachment] }
+            : t,
+        ),
+      );
+      showToast(`Đã tải lên tệp ${file.name}!`, 'success');
+      return newAttachment;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Tải lên tệp thất bại';
+      showToast(msg, 'error');
+      throw err;
     }
   };
 
@@ -242,6 +268,7 @@ export const useTasks = (projectId?: number, currentUserId?: number) => {
     deleteTask,
     addComment,
     addAttachment,
+    uploadAttachment,
     deleteAttachment,
     createLabel,
     deleteLabel,

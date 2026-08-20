@@ -3,6 +3,23 @@ export interface AssigneeResponse {
     username: string;
     fullName: string;
     email?: string | null;
+    avatar?: string | null;
+}
+
+export interface TaskActivityUserResponse {
+    id: number;
+    username: string;
+    fullName: string;
+    avatar?: string | null;
+}
+
+export interface TaskActivityResponse {
+    id: number;
+    taskId: number;
+    userId: number;
+    action: string;
+    createdAt: Date;
+    user?: TaskActivityUserResponse;
 }
 
 export interface TaskResponse {
@@ -13,7 +30,17 @@ export interface TaskResponse {
     status: number;
     priority: number;
     dueDate: Date | null;
+    assigneeId?: number | null;
     assignee?: AssigneeResponse | null;
     orderIndex: number;
     createdAt: Date;
+    activities?: TaskActivityResponse[];
+    comments?: any[];
+    attachments?: any[];
+    labels?: any[];
+    _count?: {
+        comments?: number;
+        attachments?: number;
+        activities?: number;
+    };
 }

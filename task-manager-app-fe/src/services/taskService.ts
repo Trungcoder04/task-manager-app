@@ -8,6 +8,7 @@ import {
 import { Label, CreateLabelRequest } from '../types/label.types';
 import { TaskComment } from '../types/comment.types';
 import { TaskAttachment } from '../types/attachment.types';
+import { TaskActivity } from '../types/activity.types';
 import { INITIAL_TASKS, INITIAL_LABELS, INITIAL_USERS } from './mockData';
 import { apiClient } from './apiClient';
 import { ApiResponse } from '../types/api.types';
@@ -272,43 +273,6 @@ class TaskService {
     const task = tasks.find((t) => t.id === taskId);
     if (task && task.comments) {
       task.comments = task.comments.filter((c) => c.id !== commentId);
-      this.saveTasks(tasks);
-    }
-    return Promise.resolve();
-  }
-
-  addAttachment(
-    taskId: number,
-    uploaderId: number,
-    fileName: string,
-    fileUrl: string,
-  ): Promise<TaskAttachment> {
-    const tasks = this.getStoredTasks();
-    const task = tasks.find((t) => t.id === taskId);
-    if (!task) return Promise.reject(new Error('Task không tồn tại'));
-
-    const uploader =
-      INITIAL_USERS.find((u) => u.id === uploaderId) || INITIAL_USERS[0];
-    const newAttachment: TaskAttachment = {
-      id: Date.now(),
-      taskId,
-      uploaderId,
-      fileName,
-      fileUrl,
-      uploadedAt: new Date().toISOString(),
-      uploader,
-    };
-
-    task.attachments = [...(task.attachments || []), newAttachment];
-    this.saveTasks(tasks);
-    return Promise.resolve(newAttachment);
-  }
-
-  deleteAttachment(attachmentId: number, taskId: number): Promise<void> {
-    const tasks = this.getStoredTasks();
-    const task = tasks.find((t) => t.id === taskId);
-    if (task && task.attachments) {
-      task.attachments = task.attachments.filter((a) => a.id !== attachmentId);
       this.saveTasks(tasks);
     }
     return Promise.resolve();
