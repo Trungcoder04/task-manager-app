@@ -494,6 +494,51 @@ export class TasksService {
         ? await this.getValidAssigneeId(dto.assigneeId)
         : undefined;
 
+    // So sánh dữ liệu cũ và mới để xác định những trường thực sự thay đổi
+    const changes: string[] = [];
+
+    if (dto.status !== undefined && dto.status !== existingTask.status) {
+      const statusMap: Record<number, string> = { 1: 'TODO', 2: 'DOING', 3: 'DONE' };
+      const oldStatus = statusMap[existingTask.status] || existingTask.status;
+      const newStatus = statusMap[dto.status] || dto.status;
+      changes.push(`Đổi trạng thái: ${oldStatus} → ${newStatus}`);
+    }
+
+    if (dto.priority !== undefined && dto.priority !== existingTask.priority) {
+      const priorityMap: Record<number, string> = { 1: 'Thấp', 2: 'Trung bình', 3: 'Cao' };
+      const oldPriority = priorityMap[existingTask.priority] || existingTask.priority;
+      const newPriority = priorityMap[dto.priority] || dto.priority;
+      changes.push(`Đổi độ ưu tiên: ${oldPriority} → ${newPriority}`);
+    }
+
+    if (dto.title !== undefined && dto.title.trim() !== existingTask.title) {
+      changes.push(`Đổi tiêu đề thành "${dto.title.trim()}"`);
+    }
+
+    if (dto.description !== undefined && dto.description !== existingTask.description) {
+      changes.push('Cập nhật mô tả công việc');
+    }
+
+    if (dto.dueDate !== undefined) {
+      const oldDate = existingTask.dueDate ? existingTask.dueDate.toISOString().split('T')[0] : null;
+      const newDate = dto.dueDate ? new Date(dto.dueDate).toISOString().split('T')[0] : null;
+      if (oldDate !== newDate) {
+        changes.push(newDate ? `Cập nhật hạn chót: ${newDate}` : 'Đã xóa hạn chót');
+      }
+    }
+
+    if (validAssigneeId !== undefined && validAssigneeId !== existingTask.assigneeId) {
+      if (validAssigneeId === null) {
+        changes.push('Bỏ chỉ định người thực hiện');
+      } else {
+        const newAssignee = await this.prisma.user.findUnique({
+          where: { id: validAssigneeId },
+          select: { fullName: true },
+        });
+        changes.push(`Chỉ định cho ${newAssignee?.fullName || 'thành viên mới'}`);
+      }
+    }
+
     // Cập nhật nhãn dán trong CSDL nếu có gửi labelIds
     if (dto.labelIds !== undefined) {
       await this.prisma.taskLabel.deleteMany({
@@ -522,6 +567,21 @@ export class TasksService {
         ...(dto.orderIndex !== undefined && { orderIndex: dto.orderIndex }),
       },
     });
+
+    // Tạo activity record nếu có thay đổi thực tế
+    if (changes.length > 0) {
+      try {
+        await this.prisma.taskActivity.create({
+          data: {
+            taskId,
+            userId: currentUserId,
+            action: changes.join(' • '),
+          },
+        });
+      } catch (err) {
+        this.logger.warn(`Failed to create task activity for update: ${err}`);
+      }
+    }
 
     return this.getTaskById(taskId, currentUserId);
   }

@@ -52,6 +52,10 @@ export class TaskAttachmentController {
         return this.taskAttachmentService.getAttachmentById(id);
     }
 
+    @TaskActivity({
+        action: (req) => `Xóa tệp đính kèm ${req.file?.originalname}`,
+        taskId: (req) => Number(req.params.taskId),
+    })
     @Delete(':id')
     async deleteAttachment(
         @Param('id', ParseIntPipe) id: number,

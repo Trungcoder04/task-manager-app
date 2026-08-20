@@ -78,22 +78,35 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             </div>
           )}
 
+          {/* File đính kèm */}
           {(() => {
             const attCount = task._count?.attachments ?? task.attachments?.length ?? 0;
             return attCount > 0 ? (
-              <div className="meta-item" title={`${attCount} file đính kèm`}>
+              <div className="meta-item" title={`${attCount} tệp đính kèm`}>
                 <Icon name="paperclip" size={13} />
                 <span>{attCount}</span>
               </div>
             ) : null;
           })()}
 
+          {/* Bình luận */}
           {(() => {
             const cmtCount = task._count?.comments ?? task.comments?.length ?? 0;
             return cmtCount > 0 ? (
               <div className="meta-item" title={`${cmtCount} bình luận`}>
                 <Icon name="message-square" size={13} />
                 <span>{cmtCount}</span>
+              </div>
+            ) : null;
+          })()}
+
+          {/* Lịch sử hoạt động */}
+          {(() => {
+            const actCount = task._count?.activities ?? task.activities?.length ?? 0;
+            return actCount > 0 ? (
+              <div className="meta-item" title={`${actCount} lịch sử hoạt động`}>
+                <Icon name="clock" size={13} />
+                <span>{actCount}</span>
               </div>
             ) : null;
           })()}

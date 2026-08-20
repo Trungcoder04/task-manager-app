@@ -77,10 +77,10 @@ export const TaskFilter: React.FC<TaskFilterProps> = ({
           value={filters.priority || 'ALL'}
           onChange={handlePriorityChange}
         >
-          <option value="ALL">Độ ưu tiên: Tất cả</option>
-          <option value={3}>🔴 Cao (High)</option>
-          <option value={2}>🟡 Trung bình (Medium)</option>
-          <option value={1}>🟢 Thấp (Low)</option>
+          <option value="ALL">Độ ưu tiên</option>
+          <option value={3}>🔴 Cao</option>
+          <option value={2}>🟡 Trung bình</option>
+          <option value={1}>🟢 Thấp</option>
         </select>
 
         {/* Assignee Filter */}
@@ -90,7 +90,7 @@ export const TaskFilter: React.FC<TaskFilterProps> = ({
           value={filters.assigneeId || 'ALL'}
           onChange={handleAssigneeChange}
         >
-          <option value="ALL">Người thực hiện: Tất cả</option>
+          <option value="ALL">Người thực hiện</option>
           {members.map((m) => (
             <option key={m.id} value={m.id}>
               👤 {m.fullName}
@@ -105,7 +105,7 @@ export const TaskFilter: React.FC<TaskFilterProps> = ({
           value={filters.labelId || 'ALL'}
           onChange={handleLabelChange}
         >
-          <option value="ALL">Nhãn dán: Tất cả</option>
+          <option value="ALL">Nhãn dán</option>
           {labels.map((l) => (
             <option key={l.id} value={l.id}>
               🏷️ {l.name}

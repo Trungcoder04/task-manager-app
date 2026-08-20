@@ -376,7 +376,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                   onClick={() => setIsSelectingLabels(!isSelectingLabels)}
                 >
                   <Icon name={isSelectingLabels ? 'x' : 'plus'} size={13} />
-                  <span>{isSelectingLabels ? 'Đóng chọn nhãn' : '+ Chọn nhãn'}</span>
+                  <span>{isSelectingLabels ? 'Đóng chọn nhãn' : 'Chọn nhãn'}</span>
                 </button>
               </div>
 
