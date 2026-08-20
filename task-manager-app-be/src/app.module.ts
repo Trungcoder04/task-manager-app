@@ -6,6 +6,8 @@ import { AuthModule } from './auth/auth.module';
 import { TaskAttachmentModule } from './task-attachment/task-attachment.module';
 import { MinioModule } from './minio/minio.module';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
+import { ProjectsModule } from './projects/projects.module';
+import { LabelsModule } from './labels/labels.module';
 
 @Module({
   imports: [
@@ -15,6 +17,8 @@ import { LoggerMiddleware } from './common/middleware/logger.middleware';
     UsersModule,
     AuthModule,
     TaskAttachmentModule,
+    ProjectsModule,
+    LabelsModule,
   ],
 })
 export class AppModule implements NestModule {

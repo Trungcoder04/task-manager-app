@@ -1,133 +1,81 @@
+import { apiClient } from './apiClient';
+import { ApiResponse } from '../types/api.types';
 import {
   Project,
   CreateProjectRequest,
   UpdateProjectRequest,
   ProjectMemberRoleType,
 } from '../types/project.types';
-import { INITIAL_PROJECTS, INITIAL_USERS } from './mockData';
-
-const PROJECTS_STORAGE_KEY = 'task_manager_projects';
 
 class ProjectService {
-  private getStoredProjects(): Project[] {
-    const data = localStorage.getItem(PROJECTS_STORAGE_KEY);
-    if (!data) {
-      localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(INITIAL_PROJECTS));
-      return INITIAL_PROJECTS;
+  async getProjects(): Promise<Project[]> {
+    const response = await apiClient.get<unknown, ApiResponse<Project[]>>('/projects');
+    if (response && response.result) {
+      return response.result;
     }
-    return JSON.parse(data) as Project[];
+    return [];
   }
 
-  private saveProjects(projects: Project[]): void {
-    localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(projects));
-  }
-
-  getProjects(): Promise<Project[]> {
-    return Promise.resolve(this.getStoredProjects());
-  }
-
-  getProject(id: number): Promise<Project> {
-    const projects = this.getStoredProjects();
-    const project = projects.find((p) => p.id === id);
-    if (!project) return Promise.reject(new Error('Không tìm thấy dự án'));
-    return Promise.resolve(project);
-  }
-
-  createProject(data: CreateProjectRequest, ownerId: number): Promise<Project> {
-    const projects = this.getStoredProjects();
-    const owner = INITIAL_USERS.find((u) => u.id === ownerId) || INITIAL_USERS[0];
-    const newProject: Project = {
-      id: Date.now(),
-      name: data.name,
-      description: data.description,
-      ownerId: owner.id,
-      createdAt: new Date().toISOString(),
-      owner,
-      members: [
-        {
-          projectId: Date.now(),
-          userId: owner.id,
-          role: 1, // Admin / Owner
-          joinedAt: new Date().toISOString(),
-          user: owner,
-        },
-      ],
-    };
-    projects.push(newProject);
-    this.saveProjects(projects);
-    return Promise.resolve(newProject);
-  }
-
-  updateProject(id: number, data: UpdateProjectRequest): Promise<Project> {
-    const projects = this.getStoredProjects();
-    const index = projects.findIndex((p) => p.id === id);
-    if (index === -1) return Promise.reject(new Error('Không tìm thấy dự án'));
-
-    projects[index] = {
-      ...projects[index],
-      name: data.name ?? projects[index].name,
-      description: data.description ?? projects[index].description,
-    };
-    this.saveProjects(projects);
-    return Promise.resolve(projects[index]);
-  }
-
-  deleteProject(id: number): Promise<void> {
-    const projects = this.getStoredProjects().filter((p) => p.id !== id);
-    this.saveProjects(projects);
-    return Promise.resolve();
-  }
-
-  addMember(projectId: number, userId: number, role: ProjectMemberRoleType): Promise<Project> {
-    const projects = this.getStoredProjects();
-    const project = projects.find((p) => p.id === projectId);
-    if (!project) return Promise.reject(new Error('Dự án không tồn tại'));
-
-    const user = INITIAL_USERS.find((u) => u.id === userId);
-    if (!user) return Promise.reject(new Error('Người dùng không tồn tại'));
-
-    if (!project.members) project.members = [];
-    if (project.members.some((m) => m.userId === userId)) {
-      return Promise.reject(new Error('Người dùng đã là thành viên của dự án'));
+  async getProject(id: number): Promise<Project> {
+    const response = await apiClient.get<unknown, ApiResponse<Project>>(`/projects/${id}`);
+    if (response && response.result) {
+      return response.result;
     }
-
-    project.members.push({
-      projectId,
-      userId,
-      role,
-      joinedAt: new Date().toISOString(),
-      user,
-    });
-
-    this.saveProjects(projects);
-    return Promise.resolve(project);
+    throw new Error(response?.message || 'Không thể lấy thông tin dự án');
   }
 
-  removeMember(projectId: number, userId: number): Promise<Project> {
-    const projects = this.getStoredProjects();
-    const project = projects.find((p) => p.id === projectId);
-    if (!project) return Promise.reject(new Error('Dự án không tồn tại'));
-
-    if (project.ownerId === userId) {
-      return Promise.reject(new Error('Không thể xóa Chủ dự án (Owner)'));
+  async createProject(data: CreateProjectRequest): Promise<Project> {
+    const response = await apiClient.post<unknown, ApiResponse<Project>>('/projects', data);
+    if (response && response.result) {
+      return response.result;
     }
-
-    project.members = (project.members || []).filter((m) => m.userId !== userId);
-    this.saveProjects(projects);
-    return Promise.resolve(project);
+    throw new Error(response?.message || 'Tạo dự án thất bại');
   }
 
-  updateMemberRole(projectId: number, userId: number, role: ProjectMemberRoleType): Promise<Project> {
-    const projects = this.getStoredProjects();
-    const project = projects.find((p) => p.id === projectId);
-    if (!project) return Promise.reject(new Error('Dự án không tồn tại'));
+  async updateProject(id: number, data: UpdateProjectRequest): Promise<Project> {
+    const response = await apiClient.put<unknown, ApiResponse<Project>>(`/projects/${id}`, data);
+    if (response && response.result) {
+      return response.result;
+    }
+    throw new Error(response?.message || 'Cập nhật dự án thất bại');
+  }
 
-    const member = (project.members || []).find((m) => m.userId === userId);
-    if (!member) return Promise.reject(new Error('Thành viên không tồn tại trong dự án'));
+  async deleteProject(id: number): Promise<void> {
+    await apiClient.delete<unknown, ApiResponse<void>>(`/projects/${id}`);
+  }
 
-    member.role = role;
-    this.saveProjects(projects);
-    return Promise.resolve(project);
+  // --- Quản lý thành viên ---
+
+  async addMember(projectId: number, userId: number, role: ProjectMemberRoleType): Promise<Project> {
+    const response = await apiClient.post<unknown, ApiResponse<Project>>(
+      `/projects/${projectId}/members`,
+      { userId, role }
+    );
+    if (response && response.result) {
+      return response.result;
+    }
+    throw new Error(response?.message || 'Thêm thành viên thất bại');
+  }
+
+  async removeMember(projectId: number, userId: number): Promise<Project> {
+    const response = await apiClient.delete<unknown, ApiResponse<Project>>(
+      `/projects/${projectId}/members/${userId}`
+    );
+    if (response && response.result) {
+      return response.result;
+    }
+    throw new Error(response?.message || 'Xóa thành viên thất bại');
+  }
+
+  async updateMemberRole(projectId: number, userId: number, role: ProjectMemberRoleType): Promise<Project> {
+    const response = await apiClient.put<unknown, ApiResponse<Project>>(
+      `/projects/${projectId}/members/${userId}`,
+      { role }
+    );
+    if (response && response.result) {
+      return response.result;
+    }
+    throw new Error(response?.message || 'Cập nhật vai trò thất bại');
   }
 }
 
