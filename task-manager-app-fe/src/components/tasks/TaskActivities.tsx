@@ -8,11 +8,13 @@ import { LoadingSpinner } from '../common/LoadingSpinner';
 interface TaskActivitiesProps {
   activities?: TaskActivity[];
   taskId?: number;
+  onCountChange?: (count: number) => void;
 }
 
 export const TaskActivities: React.FC<TaskActivitiesProps> = ({
   activities: initialActivities,
   taskId,
+  onCountChange,
 }) => {
   const [activities, setActivities] = useState<TaskActivity[]>(initialActivities || []);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -23,20 +25,22 @@ export const TaskActivities: React.FC<TaskActivitiesProps> = ({
     try {
       const data = await taskActivityService.getTaskActivities(taskId);
       setActivities(data);
+      onCountChange?.(data.length);
     } catch (err) {
       console.warn('Lỗi khi tải danh sách hoạt động:', err);
     } finally {
       setIsLoading(false);
     }
-  }, [taskId]);
+  }, [taskId, onCountChange]);
 
   useEffect(() => {
     if (taskId) {
       void fetchActivities();
     } else if (initialActivities) {
       setActivities(initialActivities);
+      onCountChange?.(initialActivities.length);
     }
-  }, [taskId, fetchActivities]);
+  }, [taskId, fetchActivities, initialActivities, onCountChange]);
 
   const sorted = [...activities].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),

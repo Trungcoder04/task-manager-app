@@ -52,6 +52,10 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const [activeTab, setActiveTab] = useState<'comments' | 'attachments' | 'activities'>('comments');
   const [isLoading, setIsLoading] = useState(false);
 
+  const [commentsCount, setCommentsCount] = useState<number>(0);
+  const [attachmentsCount, setAttachmentsCount] = useState<number>(0);
+  const [activitiesCount, setActivitiesCount] = useState<number>(0);
+
   useEffect(() => {
     if (task) {
       setTitle(task.title);
@@ -61,6 +65,24 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setDueDate(task.dueDate ? task.dueDate.split('T')[0] : '');
       setAssigneeId(task.assigneeId || '');
       setSelectedLabelIds((task.labels || []).map((l) => l.id));
+
+      if (task.comments !== undefined) {
+        setCommentsCount(task.comments.length);
+      } else if (task._count?.comments !== undefined) {
+        setCommentsCount(task._count.comments);
+      }
+
+      if (task.attachments !== undefined) {
+        setAttachmentsCount(task.attachments.length);
+      } else if (task._count?.attachments !== undefined) {
+        setAttachmentsCount(task._count.attachments);
+      }
+
+      if (task.activities !== undefined) {
+        setActivitiesCount(task.activities.length);
+      } else if (task._count?.activities !== undefined) {
+        setActivitiesCount(task._count.activities);
+      }
     } else {
       setTitle('');
       setDescription('');
@@ -69,7 +91,11 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setDueDate('');
       setAssigneeId('');
       setSelectedLabelIds([]);
+      setCommentsCount(0);
+      setAttachmentsCount(0);
+      setActivitiesCount(0);
     }
+    setIsSelectingLabels(false);
   }, [task, initialStatus, isOpen]);
 
   if (!isOpen) return null;
@@ -337,78 +363,28 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               </div>
             </div>
 
-<<<<<<< HEAD
-            {/* Description */}
-            <div className="form-group" style={{ margin: 0 }}>
-              <textarea
-                className="form-textarea"
-                rows={2}
-                placeholder="Thêm mô tả công việc, yêu cầu kỹ thuật hoặc ghi chú ngắn..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                disabled={isLoading}
-                style={{
-                  fontSize: '0.845rem',
-                  padding: '0.5rem 0.75rem',
-                  resize: 'vertical',
-                }}
-              />
-            </div>
-
-            {/* Labels Row */}
-            {labels.length > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', paddingTop: '0.25rem' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-                  Nhãn:
-                </span>
-                {labels.map((lbl) => {
-                  const isSelected = selectedLabelIds.includes(lbl.id);
-                  return (
-                    <button
-                      key={lbl.id}
-                      type="button"
-                      onClick={() => toggleLabel(lbl.id)}
-                      className="label-chip"
-                      style={{
-                        backgroundColor: isSelected ? lbl.colorCode || '#6366f1' : 'transparent',
-                        color: isSelected ? 'white' : lbl.colorCode || '#6366f1',
-                        border: `1px solid ${lbl.colorCode || '#6366f1'}`,
-                        cursor: 'pointer',
-                        padding: '0.15rem 0.5rem',
-                        fontSize: '0.75rem',
-                        borderRadius: '999px',
-                        transition: 'all 0.15s ease',
-                      }}
-                    >
-                      {lbl.name}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-=======
             {/* Label selection */}
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <label className="form-label" style={{ margin: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                <label className="form-label" style={{ fontSize: '0.75rem', margin: 0, color: 'var(--text-muted)' }}>
                   Nhãn dán (Labels)
                 </label>
                 <button
                   type="button"
                   className="btn btn-ghost"
-                  style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', color: 'var(--primary-500)' }}
+                  style={{ fontSize: '0.75rem', padding: '0.15rem 0.45rem', color: 'var(--primary-500)' }}
                   onClick={() => setIsSelectingLabels(!isSelectingLabels)}
                 >
-                  <Icon name={isSelectingLabels ? 'x' : 'plus'} size={14} />
-                  <span>{isSelectingLabels ? 'Đóng bảng chọn' : '+ Thêm / Chọn nhãn'}</span>
+                  <Icon name={isSelectingLabels ? 'x' : 'plus'} size={13} />
+                  <span>{isSelectingLabels ? 'Đóng chọn nhãn' : '+ Chọn nhãn'}</span>
                 </button>
               </div>
 
               {/* Display attached labels only */}
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', minHeight: '32px', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', minHeight: '28px', alignItems: 'center' }}>
                 {selectedLabelIds.length === 0 ? (
-                  <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                    Chưa có nhãn nào được gắn vào công việc này
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                    Chưa có nhãn nào được gắn
                   </span>
                 ) : (
                   labels
@@ -419,10 +395,10 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
-                          gap: '0.35rem',
-                          padding: '0.25rem 0.75rem',
+                          gap: '0.3rem',
+                          padding: '0.15rem 0.55rem',
                           borderRadius: 'var(--radius-full)',
-                          fontSize: '0.75rem',
+                          fontSize: '0.725rem',
                           fontWeight: 700,
                           backgroundColor: lbl.colorCode || '#6366f1',
                           color: '#ffffff',
@@ -431,7 +407,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                       >
                         {lbl.name}
                         <span
-                          style={{ cursor: 'pointer', opacity: 0.85, marginLeft: '3px' }}
+                          style={{ cursor: 'pointer', opacity: 0.85, marginLeft: '2px' }}
                           onClick={() => toggleLabel(lbl.id)}
                           title="Bỏ nhãn này"
                         >
@@ -446,17 +422,17 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               {isSelectingLabels && (
                 <div
                   style={{
-                    marginTop: '0.75rem',
-                    padding: '0.875rem',
-                    background: 'var(--bg-surface-secondary)',
+                    marginTop: '0.5rem',
+                    padding: '0.65rem 0.75rem',
+                    background: 'var(--bg-surface)',
                     borderRadius: 'var(--radius-md)',
                     border: '1px solid var(--border-color)',
                   }}
                 >
-                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-                    Nhấp để chọn hoặc bỏ nhãn của Dự án:
+                  <div style={{ fontSize: '0.725rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>
+                    Nhấp để chọn hoặc bỏ nhãn:
                   </div>
-                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                     {labels.map((lbl) => {
                       const isSelected = selectedLabelIds.includes(lbl.id);
                       return (
@@ -465,9 +441,9 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                           type="button"
                           onClick={() => toggleLabel(lbl.id)}
                           style={{
-                            padding: '0.25rem 0.75rem',
+                            padding: '0.2rem 0.6rem',
                             borderRadius: 'var(--radius-full)',
-                            fontSize: '0.75rem',
+                            fontSize: '0.725rem',
                             fontWeight: 700,
                             border: `1px solid ${lbl.colorCode || '#6366f1'}`,
                             background: isSelected ? (lbl.colorCode || '#6366f1') : 'transparent',
@@ -485,27 +461,22 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               )}
             </div>
 
+            {/* Description */}
             <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">Mô tả chi tiết</label>
               <textarea
                 className="form-textarea"
-                rows={4}
-                placeholder="Thêm mô tả công việc, các yêu cầu kỹ thuật hoặc ghi chú..."
+                rows={2}
+                placeholder="Thêm mô tả công việc, yêu cầu kỹ thuật hoặc ghi chú ngắn..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 disabled={isLoading}
+                style={{
+                  fontSize: '0.845rem',
+                  padding: '0.5rem 0.75rem',
+                  resize: 'vertical',
+                }}
               />
             </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
-              <Button type="button" variant="secondary" onClick={onClose} disabled={isLoading}>
-                Hủy
-              </Button>
-              <Button type="submit" variant="primary" isLoading={isLoading}>
-                {isEditing ? 'Lưu thay đổi' : 'Tạo công việc'}
-              </Button>
-            </div>
->>>>>>> f4f1d8dae55debd0a7a808b161471ac0c222b4fa
           </form>
 
           {/* Bottom Tabs: Comments, Attachments & History */}
@@ -547,7 +518,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                       backgroundColor: activeTab === 'comments' ? 'rgba(255,255,255,0.25)' : 'var(--bg-surface-secondary)',
                     }}
                   >
-                    {task._count?.comments ?? task.comments?.length ?? 0}
+                    {commentsCount}
                   </span>
                 </button>
 
@@ -567,7 +538,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                       backgroundColor: activeTab === 'attachments' ? 'rgba(255,255,255,0.25)' : 'var(--bg-surface-secondary)',
                     }}
                   >
-                    {task._count?.attachments ?? task.attachments?.length ?? 0}
+                    {attachmentsCount}
                   </span>
                 </button>
 
@@ -587,7 +558,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                       backgroundColor: activeTab === 'activities' ? 'rgba(255,255,255,0.25)' : 'var(--bg-surface-secondary)',
                     }}
                   >
-                    {task._count?.activities ?? task.activities?.length ?? 0}
+                    {activitiesCount}
                   </span>
                 </button>
               </div>
@@ -601,6 +572,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                     onAddComment={async (content) => {
                       await onAddComment(task.id, content);
                     }}
+                    onCountChange={setCommentsCount}
                   />
                 )}
 
@@ -617,11 +589,15 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                       await onAddAttachment(task.id, fn, fu);
                     }}
                     onDeleteAttachment={(attId) => onDeleteAttachment(attId, task.id)}
+                    onCountChange={setAttachmentsCount}
                   />
                 )}
 
                 {activeTab === 'activities' && (
-                  <TaskActivities taskId={task.id} />
+                  <TaskActivities
+                    taskId={task.id}
+                    onCountChange={setActivitiesCount}
+                  />
                 )}
               </div>
             </div>

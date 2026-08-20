@@ -103,7 +103,7 @@ export class TasksService {
     const validAssigneeId = await this.getValidAssigneeId(dto.assigneeId);
 
     try {
-      return await this.prisma.task.create({
+      const created = await this.prisma.task.create({
         data: {
           projectId: dto.projectId,
           title: dto.title,
@@ -113,6 +113,11 @@ export class TasksService {
           dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
           assigneeId: validAssigneeId,
           orderIndex: dto.orderIndex ?? 0,
+          ...(dto.labelIds && dto.labelIds.length > 0 && {
+            taskLabels: {
+              create: dto.labelIds.map((labelId) => ({ labelId })),
+            },
+          }),
         },
         include: {
           assignee: {
@@ -121,10 +126,21 @@ export class TasksService {
               username: true,
               fullName: true,
               email: true,
+              avatar: true,
+            },
+          },
+          taskLabels: {
+            include: {
+              label: true,
             },
           },
         },
       });
+
+      return {
+        ...created,
+        labels: created.taskLabels?.map((tl) => tl.label) ?? [],
+      };
     } catch (err) {
       this.logger.error('Error creating task in DB:', err);
       throw err;
@@ -341,6 +357,115 @@ export class TasksService {
   }
 
   /**
+   * Lấy danh sách bình luận (comments) của Task
+   */
+  async getTaskComments(
+    taskId: number,
+    currentUserId: number,
+  ) {
+    const task = await this.prisma.task.findUnique({
+      where: { id: taskId },
+      select: { projectId: true },
+    });
+
+    if (!task) {
+      throw new AppException(ErrorCode.TASK_NOT_FOUND);
+    }
+
+    const isMember = await this.isUserInProject(task.projectId, currentUserId);
+    if (!isMember) {
+      throw new AppException(ErrorCode.NOT_PROJECT_MEMBER);
+    }
+
+    return this.prisma.taskComment.findMany({
+      where: { taskId },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            fullName: true,
+            avatar: true,
+          },
+        },
+      },
+    });
+  }
+
+  /**
+   * Thêm bình luận mới vào Task
+   */
+  async addTaskComment(
+    taskId: number,
+    currentUserId: number,
+    content: string,
+  ) {
+    if (!content || !content.trim()) {
+      throw new AppException(ErrorCode.INVALID_KEY);
+    }
+
+    const task = await this.prisma.task.findUnique({
+      where: { id: taskId },
+      select: { projectId: true },
+    });
+
+    if (!task) {
+      throw new AppException(ErrorCode.TASK_NOT_FOUND);
+    }
+
+    const isMember = await this.isUserInProject(task.projectId, currentUserId);
+    if (!isMember) {
+      throw new AppException(ErrorCode.NOT_PROJECT_MEMBER);
+    }
+
+    return this.prisma.taskComment.create({
+      data: {
+        taskId,
+        userId: currentUserId,
+        content: content.trim(),
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            fullName: true,
+            avatar: true,
+          },
+        },
+      },
+    });
+  }
+
+  /**
+   * Xóa bình luận
+   */
+  async deleteTaskComment(
+    taskId: number,
+    commentId: number,
+    currentUserId: number,
+  ) {
+    const comment = await this.prisma.taskComment.findUnique({
+      where: { id: commentId },
+    });
+
+    if (!comment || comment.taskId !== taskId) {
+      throw new AppException(ErrorCode.TASK_NOT_FOUND);
+    }
+
+    if (comment.userId !== currentUserId) {
+      throw new AppException(ErrorCode.UNAUTHORIZED);
+    }
+
+    await this.prisma.taskComment.delete({
+      where: { id: commentId },
+    });
+
+    return { message: 'Bình luận đã được xóa thành công' };
+  }
+
+  /**
    * Cập nhật Task
    */
   async updateTask(
@@ -369,10 +494,24 @@ export class TasksService {
         ? await this.getValidAssigneeId(dto.assigneeId)
         : undefined;
 
-    return this.prisma.task.update({
+    // Cập nhật nhãn dán trong CSDL nếu có gửi labelIds
+    if (dto.labelIds !== undefined) {
+      await this.prisma.taskLabel.deleteMany({
+        where: { taskId },
+      });
+
+      if (dto.labelIds.length > 0) {
+        await this.prisma.taskLabel.createMany({
+          data: dto.labelIds.map((labelId) => ({ taskId, labelId })),
+          skipDuplicates: true,
+        });
+      }
+    }
+
+    await this.prisma.task.update({
       where: { id: taskId },
       data: {
-        ...(dto.title !== undefined && { title: dto.title }),
+        ...(dto.title !== undefined && { title: dto.title.trim() }),
         ...(dto.description !== undefined && { description: dto.description }),
         ...(dto.status !== undefined && { status: dto.status }),
         ...(dto.priority !== undefined && { priority: dto.priority }),
@@ -382,17 +521,9 @@ export class TasksService {
         ...(validAssigneeId !== undefined && { assigneeId: validAssigneeId }),
         ...(dto.orderIndex !== undefined && { orderIndex: dto.orderIndex }),
       },
-      include: {
-        assignee: {
-          select: {
-            id: true,
-            username: true,
-            fullName: true,
-            email: true,
-          },
-        },
-      },
     });
+
+    return this.getTaskById(taskId, currentUserId);
   }
 
   /**

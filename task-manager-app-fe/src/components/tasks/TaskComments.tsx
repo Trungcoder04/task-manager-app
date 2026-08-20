@@ -9,12 +9,14 @@ interface TaskCommentsProps {
   taskId?: number;
   comments?: TaskComment[];
   onAddComment?: (content: string) => Promise<unknown>;
+  onCountChange?: (count: number) => void;
 }
 
 export const TaskComments: React.FC<TaskCommentsProps> = ({
   taskId,
   comments: initialComments,
   onAddComment,
+  onCountChange,
 }) => {
   const [comments, setComments] = useState<TaskComment[]>(initialComments || []);
   const [content, setContent] = useState('');
@@ -27,20 +29,22 @@ export const TaskComments: React.FC<TaskCommentsProps> = ({
     try {
       const data = await taskCommentService.getComments(taskId);
       setComments(data);
+      onCountChange?.(data.length);
     } catch (err) {
       console.warn('Lỗi khi tải bình luận:', err);
     } finally {
       setIsFetching(false);
     }
-  }, [taskId]);
+  }, [taskId, onCountChange]);
 
   useEffect(() => {
     if (taskId) {
       void fetchComments();
     } else if (initialComments) {
       setComments(initialComments);
+      onCountChange?.(initialComments.length);
     }
-  }, [taskId, fetchComments]);
+  }, [taskId, fetchComments, initialComments, onCountChange]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,7 +56,11 @@ export const TaskComments: React.FC<TaskCommentsProps> = ({
         await onAddComment(content.trim());
       } else if (taskId) {
         const newCmt = await taskCommentService.addComment(taskId, content.trim());
-        setComments((prev) => [...prev, newCmt]);
+        setComments((prev) => {
+          const updated = [...prev, newCmt];
+          onCountChange?.(updated.length);
+          return updated;
+        });
       }
       setContent('');
     } finally {

@@ -7,10 +7,11 @@ import { LoadingSpinner } from '../common/LoadingSpinner';
 
 interface TaskAttachmentsProps {
   taskId?: number;
-  attachments: TaskAttachment[];
+  attachments?: TaskAttachment[];
   onUploadFile?: (file: File) => Promise<unknown>;
   onAddAttachment?: (fileName: string, fileUrl: string) => Promise<unknown>;
   onDeleteAttachment: (attachmentId: number) => Promise<void>;
+  onCountChange?: (count: number) => void;
 }
 
 export const TaskAttachments: React.FC<TaskAttachmentsProps> = ({
@@ -19,6 +20,7 @@ export const TaskAttachments: React.FC<TaskAttachmentsProps> = ({
   onUploadFile,
   onAddAttachment,
   onDeleteAttachment,
+  onCountChange,
 }) => {
   const [attachmentList, setAttachmentList] = useState<TaskAttachment[]>(initialAttachments || []);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -39,20 +41,22 @@ export const TaskAttachments: React.FC<TaskAttachmentsProps> = ({
     try {
       const data = await taskAttachmentService.getAttachments(taskId);
       setAttachmentList(data);
+      onCountChange?.(data.length);
     } catch (err) {
       console.warn('Lỗi tải tệp đính kèm:', err);
     } finally {
       setIsFetching(false);
     }
-  }, [taskId]);
+  }, [taskId, onCountChange]);
 
   React.useEffect(() => {
     if (taskId) {
       void fetchAttachments();
     } else if (initialAttachments) {
       setAttachmentList(initialAttachments);
+      onCountChange?.(initialAttachments.length);
     }
-  }, [taskId, fetchAttachments]);
+  }, [taskId, fetchAttachments, initialAttachments, onCountChange]);
 
   // Format file size
   const formatFileSize = (bytes?: number) => {
@@ -519,7 +523,11 @@ export const TaskAttachments: React.FC<TaskAttachmentsProps> = ({
                       onClick={async () => {
                         if (confirm(`Bạn có chắc muốn xóa tệp "${att.fileName}"?`)) {
                           await onDeleteAttachment(att.id);
-                          setAttachmentList((prev) => prev.filter((a) => a.id !== att.id));
+                          setAttachmentList((prev) => {
+                            const updated = prev.filter((a) => a.id !== att.id);
+                            onCountChange?.(updated.length);
+                            return updated;
+                          });
                         }
                       }}
                       title="Xóa tệp đính kèm"

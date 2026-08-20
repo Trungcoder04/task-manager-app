@@ -106,7 +106,21 @@ export const useTasks = (projectId?: number, currentUserId?: number) => {
   const updateTask = async (id: number, data: UpdateTaskRequest) => {
     try {
       const updated = await taskService.updateTask(id, data, currentUserId || 1);
-      setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)));
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === id
+            ? {
+                ...t,
+                ...updated,
+                comments: updated.comments ?? t.comments,
+                attachments: updated.attachments ?? t.attachments,
+                activities: updated.activities ?? t.activities,
+                _count: updated._count ?? t._count,
+                labels: updated.labels ?? t.labels,
+              }
+            : t,
+        ),
+      );
       return updated;
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Cập nhật công việc thất bại';
