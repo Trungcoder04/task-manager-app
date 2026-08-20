@@ -87,13 +87,11 @@ class TaskService {
         return response.result;
       }
     } catch (err) {
-      // Re-throw real backend validation errors (like ASSIGNEE_NOT_IN_PROJECT)
       if (err instanceof Error) {
         throw err;
       }
     }
 
-    // Fallback to local storage if API is not reachable
     const tasks = this.getStoredTasks();
     const allLabels = this.getStoredLabels();
     const assignee = data.assigneeId
@@ -278,15 +276,86 @@ class TaskService {
     return Promise.resolve();
   }
 
-  getLabels(projectId?: number): Promise<Label[]> {
-    const labels = this.getStoredLabels();
-    const result = projectId
-      ? labels.filter((l) => l.projectId === projectId)
-      : labels;
-    return Promise.resolve(result);
+  addAttachment(
+    taskId: number,
+    uploaderId: number,
+    fileName: string,
+    fileUrl: string,
+  ): Promise<TaskAttachment> {
+    const tasks = this.getStoredTasks();
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return Promise.reject(new Error('Task không tồn tại'));
+
+    const uploader =
+      INITIAL_USERS.find((u) => u.id === uploaderId) || INITIAL_USERS[0];
+    const newAttachment: TaskAttachment = {
+      id: Date.now(),
+      taskId,
+      uploaderId,
+      fileName,
+      fileUrl,
+      uploadedAt: new Date().toISOString(),
+      uploader,
+    };
+
+    task.attachments = [...(task.attachments || []), newAttachment];
+    this.saveTasks(tasks);
+    return Promise.resolve(newAttachment);
   }
 
-  createLabel(data: CreateLabelRequest): Promise<Label> {
+  deleteAttachment(attachmentId: number, taskId: number): Promise<void> {
+    const tasks = this.getStoredTasks();
+    const task = tasks.find((t) => t.id === taskId);
+    if (task && task.attachments) {
+      task.attachments = task.attachments.filter((a) => a.id !== attachmentId);
+      this.saveTasks(tasks);
+    }
+    return Promise.resolve();
+  }
+
+  async getLabels(projectId?: number): Promise<Label[]> {
+    if (projectId) {
+      try {
+        const response = await apiClient.get<unknown, ApiResponse<Label[]>>(
+          `/projects/${projectId}/labels`,
+        );
+        if (response && Array.isArray(response.result)) {
+          return response.result;
+        }
+        if (Array.isArray(response)) {
+          return response;
+        }
+      } catch (err) {
+        console.warn('API getLabels failed, falling back to local:', err);
+      }
+    }
+    const labels = this.getStoredLabels();
+    return projectId
+      ? labels.filter((l) => l.projectId === projectId)
+      : labels;
+  }
+
+  async createLabel(data: CreateLabelRequest): Promise<Label> {
+    try {
+      const response = await apiClient.post<unknown, ApiResponse<Label>>(
+        `/projects/${data.projectId}/labels`,
+        {
+          name: data.name,
+          colorCode: data.colorCode || '#6366f1',
+        },
+      );
+      if (response && response.result) {
+        return response.result;
+      }
+      if (response && (response as unknown as Label).id) {
+        return response as unknown as Label;
+      }
+    } catch (err) {
+      if (err instanceof Error) {
+        throw err;
+      }
+    }
+
     const labels = this.getStoredLabels();
     const newLabel: Label = {
       id: Date.now(),
@@ -296,13 +365,20 @@ class TaskService {
     };
     labels.push(newLabel);
     this.saveLabels(labels);
-    return Promise.resolve(newLabel);
+    return newLabel;
   }
 
-  deleteLabel(id: number): Promise<void> {
+  async deleteLabel(id: number, projectId?: number): Promise<void> {
+    if (projectId) {
+      try {
+        await apiClient.delete(`/projects/${projectId}/labels/${id}`);
+        return;
+      } catch (err) {
+        console.warn('API deleteLabel failed, falling back to local:', err);
+      }
+    }
     const labels = this.getStoredLabels().filter((l) => l.id !== id);
     this.saveLabels(labels);
-    return Promise.resolve();
   }
 }
 

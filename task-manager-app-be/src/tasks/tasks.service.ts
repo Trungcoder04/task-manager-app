@@ -11,7 +11,7 @@ import { ErrorCode } from '../common/errors/error-code.enum';
 export class TasksService {
   private readonly logger = new Logger(TasksService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   /**
    * Kiểm tra một User có thuộc Project hay không (là Owner hoặc là Member)
@@ -174,11 +174,43 @@ export class TasksService {
             label: true,
           },
         },
-        _count: {
-          select: {
-            comments: true,
-            attachments: true,
-            activities: true,
+        comments: {
+          orderBy: { createdAt: 'asc' },
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                fullName: true,
+                avatar: true,
+              },
+            },
+          },
+        },
+        attachments: {
+          orderBy: { uploadedAt: 'desc' },
+          include: {
+            uploader: {
+              select: {
+                id: true,
+                username: true,
+                fullName: true,
+                avatar: true,
+              },
+            },
+          },
+        },
+        activities: {
+          orderBy: { createdAt: 'desc' },
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                fullName: true,
+                avatar: true,
+              },
+            },
           },
         },
       },
@@ -187,7 +219,6 @@ export class TasksService {
     return tasks.map((task) => ({
       ...task,
       labels: task.taskLabels?.map((tl) => tl.label) ?? [],
-      _count: task._count,
     }));
   }
 
@@ -215,11 +246,43 @@ export class TasksService {
             label: true,
           },
         },
-        _count: {
-          select: {
-            comments: true,
-            attachments: true,
-            activities: true,
+        comments: {
+          orderBy: { createdAt: 'asc' },
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                fullName: true,
+                avatar: true,
+              },
+            },
+          },
+        },
+        attachments: {
+          orderBy: { uploadedAt: 'desc' },
+          include: {
+            uploader: {
+              select: {
+                id: true,
+                username: true,
+                fullName: true,
+                avatar: true,
+              },
+            },
+          },
+        },
+        activities: {
+          orderBy: { createdAt: 'desc' },
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                fullName: true,
+                avatar: true,
+              },
+            },
           },
         },
       },
@@ -237,117 +300,7 @@ export class TasksService {
     return {
       ...task,
       labels: task.taskLabels?.map((tl) => tl.label) ?? [],
-      _count: task._count,
     };
-  }
-
-  /**
-   * Lấy danh sách bình luận (comments) của Task
-   */
-  async getTaskComments(
-    taskId: number,
-    currentUserId: number,
-  ) {
-    const task = await this.prisma.task.findUnique({
-      where: { id: taskId },
-      select: { projectId: true },
-    });
-
-    if (!task) {
-      throw new AppException(ErrorCode.TASK_NOT_FOUND);
-    }
-
-    const isMember = await this.isUserInProject(task.projectId, currentUserId);
-    if (!isMember) {
-      throw new AppException(ErrorCode.NOT_PROJECT_MEMBER);
-    }
-
-    return this.prisma.taskComment.findMany({
-      where: { taskId },
-      orderBy: { createdAt: 'asc' },
-      include: {
-        user: {
-          select: {
-            id: true,
-            username: true,
-            fullName: true,
-            avatar: true,
-          },
-        },
-      },
-    });
-  }
-
-  /**
-   * Thêm bình luận mới vào Task
-   */
-  async addTaskComment(
-    taskId: number,
-    currentUserId: number,
-    content: string,
-  ) {
-    if (!content || !content.trim()) {
-      throw new AppException(ErrorCode.INVALID_KEY);
-    }
-
-    const task = await this.prisma.task.findUnique({
-      where: { id: taskId },
-      select: { projectId: true },
-    });
-
-    if (!task) {
-      throw new AppException(ErrorCode.TASK_NOT_FOUND);
-    }
-
-    const isMember = await this.isUserInProject(task.projectId, currentUserId);
-    if (!isMember) {
-      throw new AppException(ErrorCode.NOT_PROJECT_MEMBER);
-    }
-
-    return this.prisma.taskComment.create({
-      data: {
-        taskId,
-        userId: currentUserId,
-        content: content.trim(),
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            username: true,
-            fullName: true,
-            avatar: true,
-          },
-        },
-      },
-    });
-  }
-
-  /**
-   * Xóa bình luận
-   */
-  async deleteTaskComment(
-    taskId: number,
-    commentId: number,
-    currentUserId: number,
-  ) {
-    const comment = await this.prisma.taskComment.findUnique({
-      where: { id: commentId },
-    });
-
-    if (!comment || comment.taskId !== taskId) {
-      throw new AppException(ErrorCode.TASK_NOT_FOUND);
-    }
-
-    if (comment.userId !== currentUserId) {
-      throw new AppException(ErrorCode.UNAUTHORIZED);
-    }
-
-    await this.prisma.taskComment.delete({
-      where: { id: commentId },
-    });
-
-    return { message: 'Bình luận đã được xóa thành công' };
   }
 
   /**
@@ -388,7 +341,7 @@ export class TasksService {
   }
 
   /**
-   * Cập nhật Task (Chỉ ghi log khi có thay đổi thực tế)
+   * Cập nhật Task
    */
   async updateTask(
     taskId: number,
@@ -416,61 +369,10 @@ export class TasksService {
         ? await this.getValidAssigneeId(dto.assigneeId)
         : undefined;
 
-    // So sánh dữ liệu cũ và mới để xác định những trường thực sự thay đổi
-    const changes: string[] = [];
-
-    if (dto.status !== undefined && dto.status !== existingTask.status) {
-      const statusMap: Record<number, string> = { 1: 'TODO', 2: 'DOING', 3: 'DONE' };
-      const oldStatus = statusMap[existingTask.status] || existingTask.status;
-      const newStatus = statusMap[dto.status] || dto.status;
-      changes.push(`Đổi trạng thái: ${oldStatus} → ${newStatus}`);
-    }
-
-    if (dto.priority !== undefined && dto.priority !== existingTask.priority) {
-      const priorityMap: Record<number, string> = { 1: 'Thấp', 2: 'Trung bình', 3: 'Cao' };
-      const oldPriority = priorityMap[existingTask.priority] || existingTask.priority;
-      const newPriority = priorityMap[dto.priority] || dto.priority;
-      changes.push(`Đổi độ ưu tiên: ${oldPriority} → ${newPriority}`);
-    }
-
-    if (dto.title !== undefined && dto.title.trim() !== existingTask.title) {
-      changes.push(`Đổi tiêu đề thành "${dto.title.trim()}"`);
-    }
-
-    if (dto.description !== undefined && dto.description !== existingTask.description) {
-      changes.push('Cập nhật mô tả công việc');
-    }
-
-    if (dto.dueDate !== undefined) {
-      const oldDate = existingTask.dueDate ? existingTask.dueDate.toISOString().split('T')[0] : null;
-      const newDate = dto.dueDate ? new Date(dto.dueDate).toISOString().split('T')[0] : null;
-      if (oldDate !== newDate) {
-        changes.push(newDate ? `Cập nhật hạn chót: ${newDate}` : 'Đã xóa hạn chót');
-      }
-    }
-
-    if (validAssigneeId !== undefined && validAssigneeId !== existingTask.assigneeId) {
-      if (validAssigneeId === null) {
-        changes.push('Bỏ chỉ định người thực hiện');
-      } else {
-        const newAssignee = await this.prisma.user.findUnique({
-          where: { id: validAssigneeId },
-          select: { fullName: true },
-        });
-        changes.push(`Chỉ định cho ${newAssignee?.fullName || 'thành viên mới'}`);
-      }
-    }
-
-    // Nếu KHÔNG có thay đổi nào -> trả về task hiện tại mà KHÔNG tạo activity!
-    if (changes.length === 0) {
-      return this.getTaskById(taskId, currentUserId);
-    }
-
-    // Thực hiện cập nhật vào CSDL
-    await this.prisma.task.update({
+    return this.prisma.task.update({
       where: { id: taskId },
       data: {
-        ...(dto.title !== undefined && { title: dto.title.trim() }),
+        ...(dto.title !== undefined && { title: dto.title }),
         ...(dto.description !== undefined && { description: dto.description }),
         ...(dto.status !== undefined && { status: dto.status }),
         ...(dto.priority !== undefined && { priority: dto.priority }),
@@ -480,22 +382,17 @@ export class TasksService {
         ...(validAssigneeId !== undefined && { assigneeId: validAssigneeId }),
         ...(dto.orderIndex !== undefined && { orderIndex: dto.orderIndex }),
       },
-    });
-
-    // Tạo activity record với nội dung thay đổi chính xác
-    try {
-      await this.prisma.taskActivity.create({
-        data: {
-          taskId,
-          userId: currentUserId,
-          action: changes.join(' • '),
+      include: {
+        assignee: {
+          select: {
+            id: true,
+            username: true,
+            fullName: true,
+            email: true,
+          },
         },
-      });
-    } catch (err) {
-      this.logger.warn(`Failed to create task activity for update: ${err}`);
-    }
-
-    return this.getTaskById(taskId, currentUserId);
+      },
+    });
   }
 
   /**
