@@ -41,7 +41,7 @@ export const useProjects = (ownerId?: number) => {
 
   const createProject = async (data: CreateProjectRequest) => {
     try {
-      const newProj = await projectService.createProject(data, ownerId || 1);
+      const newProj = await projectService.createProject(data);
       setProjects((prev) => [...prev, newProj]);
       setActiveProject(newProj);
       showToast('Tạo dự án thành công!', 'success');

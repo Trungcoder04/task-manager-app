@@ -7,6 +7,7 @@ import {
   Min,
   Max,
   IsDateString,
+  IsArray,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -47,4 +48,9 @@ export class CreateTaskDto {
   @IsOptional()
   @Type(() => Number)
   orderIndex?: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  labelIds?: number[];
 }
