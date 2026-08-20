@@ -3,6 +3,8 @@ import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
+import { TaskAttachmentModule } from './task-attachment/task-attachment.module';
+import { MinioModule } from './minio/minio.module';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { ProjectsModule } from './projects/projects.module';
 import { LabelsModule } from './labels/labels.module';
@@ -11,8 +13,10 @@ import { LabelsModule } from './labels/labels.module';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
+    MinioModule,
     UsersModule,
     AuthModule,
+    TaskAttachmentModule,
     ProjectsModule,
     LabelsModule,
   ],

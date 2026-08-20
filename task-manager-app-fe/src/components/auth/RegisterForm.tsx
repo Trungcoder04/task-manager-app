@@ -14,6 +14,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { register } = useAuth();
@@ -21,16 +22,32 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (username.trim().length < 4) {
-      setError('Tên đăng nhập phải có ít nhất 4 ký tự');
-      return;
-    }
+
     if (!fullName.trim()) {
       setError('Vui lòng nhập họ và tên');
       return;
     }
+
+    if (username.trim().length < 4) {
+      setError('Tên đăng nhập phải có ít nhất 4 ký tự');
+      return;
+    }
+
+    if (email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email.trim())) {
+        setError('Địa chỉ email không đúng định dạng');
+        return;
+      }
+    }
+
     if (password.length < 6) {
       setError('Mật khẩu phải có ít nhất 6 ký tự');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError('Mật khẩu xác nhận không khớp');
       return;
     }
 
@@ -43,7 +60,7 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =
         email: email.trim() || undefined,
         password,
       });
-      showToast('Đăng ký tài khoản thành công!', 'success');
+      showToast('Đăng ký tài khoản thành công! Đang đăng nhập...', 'success');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Đăng ký thất bại';
       setError(msg);
@@ -134,6 +151,19 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =
         required
       />
 
+      <Input
+        label="Xác nhận mật khẩu"
+        type="password"
+        placeholder="••••••••"
+        value={confirmPassword}
+        onChange={(e) => {
+          setConfirmPassword(e.target.value);
+          if (error) setError('');
+        }}
+        disabled={isLoading}
+        required
+      />
+
       <Button
         type="submit"
         variant="primary"
@@ -166,3 +196,4 @@ export const RegisterForm: React.FC<RegisterFormProps> = ({ onSwitchToLogin }) =
     </form>
   );
 };
+

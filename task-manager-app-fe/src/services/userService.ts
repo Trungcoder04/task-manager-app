@@ -1,50 +1,54 @@
-import { apiClient } from './apiClient';
 import { ApiResponse } from '../types/api.types';
 import { User, UserUpdateRequest } from '../types/user.types';
-
-const USER_STORAGE_KEY = 'task_manager_user';
+import apiClient from './apiClient';
 
 class UserService {
   async getUsers(): Promise<User[]> {
-    const response = await apiClient.get<unknown, ApiResponse<User[]>>('/users');
-    if (response && response.result) {
-      return response.result;
+    try {
+      const res = await apiClient.get<unknown, ApiResponse<User[]>>('/users');
+      if (res && res.result) {
+        return res.result;
+      }
+      return [];
+    } catch {
+      return [];
     }
-    return [];
   }
 
   async getUser(id: number): Promise<User> {
-    const response = await apiClient.get<unknown, ApiResponse<User>>(`/users/${id}`);
-    if (response && response.result) {
-      return response.result;
+    const res = await apiClient.get<unknown, ApiResponse<User>>(`/users/${id}`);
+    if (res && res.result) {
+      return res.result;
     }
-    throw new Error(response?.message || 'Không tìm thấy người dùng');
+    throw new Error(res?.message || 'User not found');
   }
 
   async updateUser(id: number, data: UserUpdateRequest): Promise<User> {
-    const response = await apiClient.put<unknown, ApiResponse<User>>(`/users/${id}`, data);
-    
-    if (response && response.result) {
-      const updatedUser = response.result;
-
-      // Giữ nguyên logic update lại thông tin session nếu người dùng đang tự sửa profile của chính mình
-      const currentUserStr = localStorage.getItem(USER_STORAGE_KEY);
-      if (currentUserStr) {
-        const currentUser = JSON.parse(currentUserStr) as User;
-        if (currentUser.id === id) {
-          // Lưu lại thông tin mới nhất vào localStorage để Header/Sidebar cập nhật ngay lập tức
-          localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updatedUser));
-        }
-      }
-
-      return updatedUser;
+    const res = await apiClient.put<unknown, ApiResponse<User>>(`/users/${id}`, data);
+    if (res && res.result) {
+      return res.result;
     }
-    throw new Error(response?.message || 'Cập nhật thông tin thất bại');
+    throw new Error(res?.message || 'Cập nhật thất bại');
   }
 
-  async deleteUser(id: number): Promise<void> {
-    await apiClient.delete<unknown, ApiResponse<void>>(`/users/${id}`);
+  async uploadAvatar(userId: number, file: File): Promise<{ avatar: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await apiClient.post<unknown, ApiResponse<{ avatar: string }>>(
+      `/users/${userId}/avatar`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      },
+    );
+    if (res && res.result) {
+      return res.result;
+    }
+    throw new Error(res?.message || 'Tải ảnh đại diện thất bại');
   }
 }
 
 export const userService = new UserService();
+

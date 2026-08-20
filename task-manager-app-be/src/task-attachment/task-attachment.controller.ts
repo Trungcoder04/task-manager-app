@@ -1,0 +1,64 @@
+import {
+    Controller,
+    Post,
+    Get,
+    Delete,
+    Param,
+    UploadedFile,
+    UseInterceptors,
+    ParseIntPipe,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { TaskAttachmentService } from './task-attachment.service';
+import { TaskAttachmentResponse } from './dto/task-attachment-response.dto';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+
+@Controller('task-attachments')
+export class TaskAttachmentController {
+    constructor(
+        private readonly taskAttachmentService: TaskAttachmentService,
+    ) { }
+
+    @Post('upload/:taskId')
+    @UseInterceptors(FileInterceptor('file'))
+    async uploadAttachment(
+        @Param('taskId', ParseIntPipe) taskId: number,
+        @UploadedFile() file: Express.Multer.File,
+        @CurrentUser('id') uploaderId: number,
+    ): Promise<TaskAttachmentResponse> {
+        return this.taskAttachmentService.uploadAttachment(
+            taskId,
+            file,
+            uploaderId,
+        );
+    }
+
+    @Get('task/:taskId')
+    async getAttachmentsByTaskId(
+        @Param('taskId', ParseIntPipe) taskId: number,
+    ): Promise<TaskAttachmentResponse[]> {
+        return this.taskAttachmentService.getAttachmentsByTaskId(taskId);
+    }
+
+    @Get(':id')
+    async getAttachmentById(
+        @Param('id', ParseIntPipe) id: number,
+    ): Promise<TaskAttachmentResponse> {
+        return this.taskAttachmentService.getAttachmentById(id);
+    }
+
+    @Delete(':id')
+    async deleteAttachment(
+        @Param('id', ParseIntPipe) id: number,
+        @CurrentUser('id') userId: number,
+    ): Promise<{ message: string }> {
+        return this.taskAttachmentService.deleteAttachment(id, userId);
+    }
+
+    @Get(':id/presigned-url')
+    async getPresignedUrl(
+        @Param('id', ParseIntPipe) id: number,
+    ): Promise<{ downloadUrl: string }> {
+        return this.taskAttachmentService.getPresignedDownloadUrl(id);
+    }
+}
