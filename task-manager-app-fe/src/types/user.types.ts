@@ -4,6 +4,7 @@ export interface User {
   fullName: string;
   email?: string;
   createdAt: string;
+  avatar?: string;
   avatarUrl?: string;
 }
 
@@ -18,4 +19,5 @@ export interface UserUpdateRequest {
   password?: string;
   fullName?: string;
   email?: string;
+  oldPassword?: string;
 }

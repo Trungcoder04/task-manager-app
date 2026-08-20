@@ -4,6 +4,11 @@ export class UserUpdateRequest {
   @MinLength(6, { message: 'INVALID_PASSWORD' })
   @IsString()
   @IsOptional()
+  oldPassword?: string;
+
+  @MinLength(6, { message: 'INVALID_PASSWORD' })
+  @IsString()
+  @IsOptional()
   password?: string;
 
   @IsString()

@@ -3,5 +3,6 @@ export class UserResponse {
   username: string;
   fullName: string;
   email?: string;
+  avatar?: string;
   createdAt: Date;
 }
