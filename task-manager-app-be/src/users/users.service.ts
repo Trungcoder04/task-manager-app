@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { MinioService } from '../minio/minio.service';
 import { UserCreationRequest } from './dto/user-creation-request.dto';
 import { UserUpdateRequest } from './dto/user-update-request.dto';
 import { UserResponse } from './dto/user-response.dto';
+import { UserUpdateAvatarResponse } from './dto/user-update-avatar-response.dto';
 import { AppException } from '../common/errors/app.exception';
 import { ErrorCode } from '../common/errors/error-code.enum';
 import * as bcrypt from 'bcrypt';
@@ -10,7 +12,10 @@ import { Prisma, User } from '@prisma/client';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly minioService: MinioService,
+  ) {}
 
   private mapToUserResponse(user: User): UserResponse {
     return {
@@ -18,6 +23,7 @@ export class UsersService {
       username: user.username,
       fullName: user.fullName,
       email: user.email ?? undefined,
+      avatar: user.avatar ?? undefined,
       createdAt: user.createdAt,
     };
   }
@@ -152,5 +158,44 @@ export class UsersService {
       console.error('deleteUser Exception', e);
       throw new AppException(ErrorCode.USER_NOT_EXISTED);
     }
+  }
+
+  async updateAvatar(
+    userId: number,
+    file: Express.Multer.File,
+    authenticatedUserId: number,
+  ): Promise<UserUpdateAvatarResponse> {
+    if (!file) {
+      throw new AppException(ErrorCode.FILE_REQUIRED);
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new AppException(ErrorCode.USER_NOT_EXISTED);
+    }
+
+    if (user.id !== authenticatedUserId) {
+      throw new AppException(ErrorCode.UNAUTHORIZED);
+    }
+
+    // Delete old avatar from MinIO if exists
+    if (user.avatar) {
+      await this.minioService.deleteFile(user.avatar);
+    }
+
+    const { fileUrl } = await this.minioService.uploadFile(
+      `avatars/${userId}`,
+      file,
+    );
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { avatar: fileUrl },
+    });
+
+    return { avatar: fileUrl };
   }
 }

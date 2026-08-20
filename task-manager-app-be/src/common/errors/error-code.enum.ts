@@ -37,7 +37,7 @@ export const ErrorCode = {
   },
   UNAUTHENTICATED: {
     code: 1006,
-    message: 'Mật khẩu không chính xác',
+    message: 'Tài khoản chưa xác thực',
     statusCode: 401,
   },
   UNAUTHORIZED: {
@@ -59,6 +59,21 @@ export const ErrorCode = {
     code: 1010,
     message: 'Password cũ sai',
     statusCode: 400,
+  },
+  TASK_NOT_EXISTED: {
+    code: 1011,
+    message: 'Không tìm thấy công việc',
+    statusCode: 404,
+  },
+  FILE_REQUIRED: {
+    code: 1012,
+    message: 'Vui lòng chọn tệp đính kèm',
+    statusCode: 400,
+  },
+  ATTACHMENT_NOT_FOUND: {
+    code: 1013,
+    message: 'Không tìm thấy tệp đính kèm',
+    statusCode: 404,
   },
 } as const;
 

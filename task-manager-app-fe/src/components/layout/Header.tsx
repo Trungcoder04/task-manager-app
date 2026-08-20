@@ -99,7 +99,7 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
 
         <div onClick={onOpenProfile} style={{ cursor: 'pointer' }}>
-          <Avatar name={user?.fullName || 'User'} src={user?.avatarUrl} size="sm" />
+          <Avatar name={user?.fullName || 'User'} src={user?.avatar || user?.avatarUrl} size="sm" />
         </div>
       </div>
     </header>

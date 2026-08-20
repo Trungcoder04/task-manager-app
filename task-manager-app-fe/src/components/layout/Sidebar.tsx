@@ -49,7 +49,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       <div className="sidebar-footer">
         <div className="user-mini-profile" onClick={onOpenProfile} title="Xem hồ sơ">
-          <Avatar name={user?.fullName || 'User'} src={user?.avatarUrl} size="sm" />
+          <Avatar name={user?.fullName || 'User'} src={user?.avatar || user?.avatarUrl} size="sm" />
           <div className="user-mini-info" style={{ minWidth: 0 }}>
             <div className="user-mini-name">{user?.fullName || 'User'}</div>
             <div className="user-mini-email">{user?.email || `@${user?.username}`}</div>

@@ -30,6 +30,24 @@ class UserService {
     }
     throw new Error(res?.message || 'Cập nhật thất bại');
   }
+
+  async uploadAvatar(userId: number, file: File): Promise<{ avatar: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await apiClient.post<unknown, ApiResponse<{ avatar: string }>>(
+      `/users/${userId}/avatar`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      },
+    );
+    if (res && res.result) {
+      return res.result;
+    }
+    throw new Error(res?.message || 'Tải ảnh đại diện thất bại');
+  }
 }
 
 export const userService = new UserService();
