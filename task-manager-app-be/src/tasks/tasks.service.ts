@@ -7,6 +7,31 @@ import { TaskResponse } from './dto/task-response.dto';
 import { AppException } from '../common/errors/app.exception';
 import { ErrorCode } from '../common/errors/error-code.enum';
 
+const taskInclude = {
+  assignee: {
+    select: {
+      id: true,
+      username: true,
+      fullName: true,
+      email: true,
+    },
+  },
+  taskLabels: {
+    include: {
+      label: true,
+    },
+  },
+};
+
+function formatTaskResponse(task: any): TaskResponse {
+  if (!task) return task;
+  const { taskLabels, ...rest } = task;
+  return {
+    ...rest,
+    labels: taskLabels ? taskLabels.map((tl: any) => tl.label).filter(Boolean) : [],
+  };
+}
+
 @Injectable()
 export class TasksService {
   private readonly logger = new Logger(TasksService.name);
@@ -89,7 +114,7 @@ export class TasksService {
   }
 
   /**
-   * Tạo mới Task (Có kiểm tra ràng buộc Assignee phải thuộc Project)
+   * Tạo mới Task (Có lưu nhãn dán TaskLabel vào MySQL)
    */
   async createTask(
     currentUserId: number,
@@ -103,7 +128,7 @@ export class TasksService {
     const validAssigneeId = await this.getValidAssigneeId(dto.assigneeId);
 
     try {
-      return await this.prisma.task.create({
+      const newTask = await this.prisma.task.create({
         data: {
           projectId: dto.projectId,
           title: dto.title,
@@ -113,18 +138,15 @@ export class TasksService {
           dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
           assigneeId: validAssigneeId,
           orderIndex: dto.orderIndex ?? 0,
-        },
-        include: {
-          assignee: {
-            select: {
-              id: true,
-              username: true,
-              fullName: true,
-              email: true,
+          ...(dto.labelIds && dto.labelIds.length > 0 && {
+            taskLabels: {
+              create: dto.labelIds.map((labelId) => ({ labelId })),
             },
-          },
+          }),
         },
+        include: taskInclude,
       });
+      return formatTaskResponse(newTask);
     } catch (err) {
       this.logger.error('Error creating task in DB:', err);
       throw err;
@@ -132,7 +154,7 @@ export class TasksService {
   }
 
   /**
-   * Lấy danh sách Task theo Project (Có filter & tìm kiếm)
+   * Lấy danh sách Task theo Project (Có include Labels từ MySQL)
    */
   async getProjectTasks(
     projectId: number,
@@ -156,20 +178,12 @@ export class TasksService {
       ];
     }
 
-    return this.prisma.task.findMany({
+    const tasks = await this.prisma.task.findMany({
       where: whereCondition,
       orderBy: [{ orderIndex: 'asc' }, { createdAt: 'desc' }],
-      include: {
-        assignee: {
-          select: {
-            id: true,
-            username: true,
-            fullName: true,
-            email: true,
-          },
-        },
-      },
+      include: taskInclude,
     });
+    return tasks.map(formatTaskResponse);
   }
 
   /**
@@ -181,16 +195,7 @@ export class TasksService {
   ): Promise<TaskResponse> {
     const task = await this.prisma.task.findUnique({
       where: { id: taskId },
-      include: {
-        assignee: {
-          select: {
-            id: true,
-            username: true,
-            fullName: true,
-            email: true,
-          },
-        },
-      },
+      include: taskInclude,
     });
 
     if (!task) {
@@ -202,11 +207,11 @@ export class TasksService {
       throw new AppException(ErrorCode.NOT_PROJECT_MEMBER);
     }
 
-    return task;
+    return formatTaskResponse(task);
   }
 
   /**
-   * Cập nhật Task
+   * Cập nhật Task (Cập nhật cả danh sách Nhãn TaskLabel)
    */
   async updateTask(
     taskId: number,
@@ -234,7 +239,18 @@ export class TasksService {
         ? await this.getValidAssigneeId(dto.assigneeId)
         : undefined;
 
-    return this.prisma.task.update({
+    if (dto.labelIds !== undefined) {
+      await this.prisma.taskLabel.deleteMany({
+        where: { taskId },
+      });
+      if (dto.labelIds.length > 0) {
+        await this.prisma.taskLabel.createMany({
+          data: dto.labelIds.map((labelId) => ({ taskId, labelId })),
+        });
+      }
+    }
+
+    const updatedTask = await this.prisma.task.update({
       where: { id: taskId },
       data: {
         ...(dto.title !== undefined && { title: dto.title }),
@@ -247,17 +263,10 @@ export class TasksService {
         ...(validAssigneeId !== undefined && { assigneeId: validAssigneeId }),
         ...(dto.orderIndex !== undefined && { orderIndex: dto.orderIndex }),
       },
-      include: {
-        assignee: {
-          select: {
-            id: true,
-            username: true,
-            fullName: true,
-            email: true,
-          },
-        },
-      },
+      include: taskInclude,
     });
+
+    return formatTaskResponse(updatedTask);
   }
 
   /**
