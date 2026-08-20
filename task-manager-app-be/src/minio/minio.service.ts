@@ -24,7 +24,6 @@ export class MinioService implements OnModuleInit {
         this.logger.log(`Created MinIO bucket: ${bucket}`);
       }
 
-      // Configure Public Read policy so files/avatars can be accessed via URL in browser
       const policy = {
         Version: '2012-10-17',
         Statement: [
