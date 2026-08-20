@@ -46,6 +46,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const [dueDate, setDueDate] = useState('');
   const [assigneeId, setAssigneeId] = useState<number | ''>('');
   const [selectedLabelIds, setSelectedLabelIds] = useState<number[]>([]);
+  const [isSelectingLabels, setIsSelectingLabels] = useState(false);
   const [activeTab, setActiveTab] = useState<'comments' | 'attachments' | 'activities'>('comments');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -230,30 +231,100 @@ export const TaskModal: React.FC<TaskModalProps> = ({
 
             {/* Label selection */}
             <div>
-              <label className="form-label" style={{ display: 'block', marginBottom: '0.5rem' }}>
-                Nhãn dán (Labels)
-              </label>
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                {labels.map((lbl) => {
-                  const isSelected = selectedLabelIds.includes(lbl.id);
-                  return (
-                    <button
-                      key={lbl.id}
-                      type="button"
-                      onClick={() => toggleLabel(lbl.id)}
-                      className="label-chip"
-                      style={{
-                        backgroundColor: isSelected ? lbl.colorCode || '#6366f1' : 'transparent',
-                        color: isSelected ? 'white' : lbl.colorCode || '#6366f1',
-                        border: `1px solid ${lbl.colorCode || '#6366f1'}`,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {lbl.name}
-                    </button>
-                  );
-                })}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <label className="form-label" style={{ margin: 0 }}>
+                  Nhãn dán (Labels)
+                </label>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', color: 'var(--primary-500)' }}
+                  onClick={() => setIsSelectingLabels(!isSelectingLabels)}
+                >
+                  <Icon name={isSelectingLabels ? 'x' : 'plus'} size={14} />
+                  <span>{isSelectingLabels ? 'Đóng bảng chọn' : '+ Thêm / Chọn nhãn'}</span>
+                </button>
               </div>
+
+              {/* Display attached labels only */}
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', minHeight: '32px', alignItems: 'center' }}>
+                {selectedLabelIds.length === 0 ? (
+                  <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                    Chưa có nhãn nào được gắn vào công việc này
+                  </span>
+                ) : (
+                  labels
+                    .filter((lbl) => selectedLabelIds.includes(lbl.id))
+                    .map((lbl) => (
+                      <span
+                        key={lbl.id}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          padding: '0.25rem 0.75rem',
+                          borderRadius: 'var(--radius-full)',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          backgroundColor: lbl.colorCode || '#6366f1',
+                          color: '#ffffff',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+                        }}
+                      >
+                        {lbl.name}
+                        <span
+                          style={{ cursor: 'pointer', opacity: 0.85, marginLeft: '3px' }}
+                          onClick={() => toggleLabel(lbl.id)}
+                          title="Bỏ nhãn này"
+                        >
+                          ✕
+                        </span>
+                      </span>
+                    ))
+                )}
+              </div>
+
+              {/* Expandable panel to pick from all project labels */}
+              {isSelectingLabels && (
+                <div
+                  style={{
+                    marginTop: '0.75rem',
+                    padding: '0.875rem',
+                    background: 'var(--bg-surface-secondary)',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border-color)',
+                  }}
+                >
+                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
+                    Nhấp để chọn hoặc bỏ nhãn của Dự án:
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    {labels.map((lbl) => {
+                      const isSelected = selectedLabelIds.includes(lbl.id);
+                      return (
+                        <button
+                          key={lbl.id}
+                          type="button"
+                          onClick={() => toggleLabel(lbl.id)}
+                          style={{
+                            padding: '0.25rem 0.75rem',
+                            borderRadius: 'var(--radius-full)',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            border: `1px solid ${lbl.colorCode || '#6366f1'}`,
+                            background: isSelected ? (lbl.colorCode || '#6366f1') : 'transparent',
+                            color: isSelected ? '#ffffff' : (lbl.colorCode || '#6366f1'),
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                          }}
+                        >
+                          {isSelected ? '✓ ' : '+ '} {lbl.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="form-group" style={{ margin: 0 }}>

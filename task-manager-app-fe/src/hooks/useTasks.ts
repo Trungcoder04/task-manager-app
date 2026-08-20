@@ -218,7 +218,7 @@ export const useTasks = (projectId?: number, currentUserId?: number) => {
 
   const deleteLabel = async (labelId: number) => {
     try {
-      await taskService.deleteLabel(labelId);
+      await taskService.deleteLabel(labelId, projectId);
       setLabels((prev) => prev.filter((l) => l.id !== labelId));
       showToast('Đã xóa nhãn!', 'info');
     } catch (err) {
