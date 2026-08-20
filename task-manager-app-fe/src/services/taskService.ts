@@ -9,6 +9,8 @@ import { Label, CreateLabelRequest } from '../types/label.types';
 import { TaskComment } from '../types/comment.types';
 import { TaskAttachment } from '../types/attachment.types';
 import { INITIAL_TASKS, INITIAL_LABELS, INITIAL_USERS } from './mockData';
+import { apiClient } from './apiClient';
+import { ApiResponse } from '../types/api.types';
 
 const TASKS_STORAGE_KEY = 'task_manager_tasks';
 const LABELS_STORAGE_KEY = 'task_manager_labels';
@@ -40,26 +42,64 @@ class TaskService {
     localStorage.setItem(LABELS_STORAGE_KEY, JSON.stringify(labels));
   }
 
-  getTasks(projectId?: number): Promise<Task[]> {
+  async getTasks(projectId?: number): Promise<Task[]> {
+    if (projectId) {
+      try {
+        const response = await apiClient.get<unknown, ApiResponse<Task[]>>(
+          `/projects/${projectId}/tasks`,
+        );
+        if (response && Array.isArray(response.result)) {
+          return response.result;
+        }
+      } catch (err) {
+        console.warn('API getTasks failed, falling back to local:', err);
+      }
+    }
     const tasks = this.getStoredTasks();
-    const result = projectId ? tasks.filter((t) => t.projectId === projectId) : tasks;
-    return Promise.resolve(result);
+    return projectId ? tasks.filter((t) => t.projectId === projectId) : tasks;
   }
 
-  getTask(id: number): Promise<Task> {
+  async getTask(id: number): Promise<Task> {
+    try {
+      const response = await apiClient.get<unknown, ApiResponse<Task>>(
+        `/tasks/${id}`,
+      );
+      if (response && response.result) {
+        return response.result;
+      }
+    } catch (err) {
+      console.warn('API getTask failed, falling back to local:', err);
+    }
     const tasks = this.getStoredTasks();
     const task = tasks.find((t) => t.id === id);
     if (!task) return Promise.reject(new Error('Không tìm thấy công việc'));
-    return Promise.resolve(task);
+    return task;
   }
 
-  createTask(data: CreateTaskRequest, creatorId: number): Promise<Task> {
+  async createTask(data: CreateTaskRequest, creatorId: number): Promise<Task> {
+    try {
+      const response = await apiClient.post<unknown, ApiResponse<Task>>(
+        '/tasks',
+        data,
+      );
+      if (response && response.result) {
+        return response.result;
+      }
+    } catch (err) {
+      // Re-throw real backend validation errors (like ASSIGNEE_NOT_IN_PROJECT)
+      if (err instanceof Error) {
+        throw err;
+      }
+    }
+
+    // Fallback to local storage if API is not reachable
     const tasks = this.getStoredTasks();
     const allLabels = this.getStoredLabels();
     const assignee = data.assigneeId
       ? INITIAL_USERS.find((u) => u.id === data.assigneeId)
       : undefined;
-    const creator = INITIAL_USERS.find((u) => u.id === creatorId) || INITIAL_USERS[0];
+    const creator =
+      INITIAL_USERS.find((u) => u.id === creatorId) || INITIAL_USERS[0];
     const selectedLabels = data.labelIds
       ? allLabels.filter((l) => data.labelIds?.includes(l.id))
       : [];
@@ -93,17 +133,32 @@ class TaskService {
 
     tasks.push(newTask);
     this.saveTasks(tasks);
-    return Promise.resolve(newTask);
+    return newTask;
   }
 
-  updateTask(
+  async updateTask(
     id: number,
     data: UpdateTaskRequest,
     updaterId?: number,
   ): Promise<Task> {
+    try {
+      const response = await apiClient.put<unknown, ApiResponse<Task>>(
+        `/tasks/${id}`,
+        data,
+      );
+      if (response && response.result) {
+        return response.result;
+      }
+    } catch (err) {
+      if (err instanceof Error) {
+        throw err;
+      }
+    }
+
     const tasks = this.getStoredTasks();
     const index = tasks.findIndex((t) => t.id === id);
-    if (index === -1) return Promise.reject(new Error('Không tìm thấy công việc'));
+    if (index === -1)
+      return Promise.reject(new Error('Không tìm thấy công việc'));
 
     const current = tasks[index];
     const allLabels = this.getStoredLabels();
@@ -113,9 +168,12 @@ class TaskService {
 
     const newActivities = [...(current.activities || [])];
 
-    // Audit logs
     if (data.status !== undefined && data.status !== current.status) {
-      const statusMap: Record<number, string> = { 1: 'Todo', 2: 'Doing', 3: 'Done' };
+      const statusMap: Record<number, string> = {
+        1: 'Todo',
+        2: 'Doing',
+        3: 'Done',
+      };
       newActivities.push({
         id: Date.now(),
         taskId: id,
@@ -127,28 +185,16 @@ class TaskService {
     }
 
     if (data.priority !== undefined && data.priority !== current.priority) {
-      const priorityMap: Record<number, string> = { 1: 'Low', 2: 'Medium', 3: 'High' };
+      const priorityMap: Record<number, string> = {
+        1: 'Low',
+        2: 'Medium',
+        3: 'High',
+      };
       newActivities.push({
         id: Date.now() + 1,
         taskId: id,
         userId: updater.id,
         action: `${updater.fullName} đổi Priority: ${priorityMap[current.priority]} → ${priorityMap[data.priority]}`,
-        createdAt: new Date().toISOString(),
-        user: updater,
-      });
-    }
-
-    if (data.assigneeId !== undefined && data.assigneeId !== current.assigneeId) {
-      const newAssignee = data.assigneeId
-        ? INITIAL_USERS.find((u) => u.id === data.assigneeId)
-        : null;
-      newActivities.push({
-        id: Date.now() + 2,
-        taskId: id,
-        userId: updater.id,
-        action: newAssignee
-          ? `${updater.fullName} đã giao Task cho ${newAssignee.fullName}`
-          : `${updater.fullName} đã hủy người thực hiện Task`,
         createdAt: new Date().toISOString(),
         user: updater,
       });
@@ -171,7 +217,10 @@ class TaskService {
       status: data.status ?? current.status,
       priority: data.priority ?? current.priority,
       dueDate: data.dueDate ?? current.dueDate,
-      assigneeId: data.assigneeId !== undefined ? (data.assigneeId ?? undefined) : current.assigneeId,
+      assigneeId:
+        data.assigneeId !== undefined
+          ? (data.assigneeId ?? undefined)
+          : current.assigneeId,
       assignee: updatedAssignee,
       labels: updatedLabels,
       orderIndex: data.orderIndex ?? current.orderIndex,
@@ -179,21 +228,31 @@ class TaskService {
     };
 
     this.saveTasks(tasks);
-    return Promise.resolve(tasks[index]);
+    return tasks[index];
   }
 
-  deleteTask(id: number): Promise<void> {
+  async deleteTask(id: number): Promise<void> {
+    try {
+      await apiClient.delete(`/tasks/${id}`);
+      return;
+    } catch (err) {
+      console.warn('API deleteTask failed, falling back to local:', err);
+    }
     const tasks = this.getStoredTasks().filter((t) => t.id !== id);
     this.saveTasks(tasks);
-    return Promise.resolve();
   }
 
-  addComment(taskId: number, userId: number, content: string): Promise<TaskComment> {
+  addComment(
+    taskId: number,
+    userId: number,
+    content: string,
+  ): Promise<TaskComment> {
     const tasks = this.getStoredTasks();
     const task = tasks.find((t) => t.id === taskId);
     if (!task) return Promise.reject(new Error('Task không tồn tại'));
 
-    const user = INITIAL_USERS.find((u) => u.id === userId) || INITIAL_USERS[0];
+    const user =
+      INITIAL_USERS.find((u) => u.id === userId) || INITIAL_USERS[0];
     const newComment: TaskComment = {
       id: Date.now(),
       taskId,
@@ -203,10 +262,19 @@ class TaskService {
       user,
     };
 
-    if (!task.comments) task.comments = [];
-    task.comments.push(newComment);
+    task.comments = [...(task.comments || []), newComment];
     this.saveTasks(tasks);
     return Promise.resolve(newComment);
+  }
+
+  deleteComment(commentId: number, taskId: number): Promise<void> {
+    const tasks = this.getStoredTasks();
+    const task = tasks.find((t) => t.id === taskId);
+    if (task && task.comments) {
+      task.comments = task.comments.filter((c) => c.id !== commentId);
+      this.saveTasks(tasks);
+    }
+    return Promise.resolve();
   }
 
   addAttachment(
@@ -219,7 +287,8 @@ class TaskService {
     const task = tasks.find((t) => t.id === taskId);
     if (!task) return Promise.reject(new Error('Task không tồn tại'));
 
-    const uploader = INITIAL_USERS.find((u) => u.id === uploaderId) || INITIAL_USERS[0];
+    const uploader =
+      INITIAL_USERS.find((u) => u.id === uploaderId) || INITIAL_USERS[0];
     const newAttachment: TaskAttachment = {
       id: Date.now(),
       taskId,
@@ -230,8 +299,7 @@ class TaskService {
       uploader,
     };
 
-    if (!task.attachments) task.attachments = [];
-    task.attachments.push(newAttachment);
+    task.attachments = [...(task.attachments || []), newAttachment];
     this.saveTasks(tasks);
     return Promise.resolve(newAttachment);
   }
@@ -239,16 +307,18 @@ class TaskService {
   deleteAttachment(attachmentId: number, taskId: number): Promise<void> {
     const tasks = this.getStoredTasks();
     const task = tasks.find((t) => t.id === taskId);
-    if (!task) return Promise.resolve();
-
-    task.attachments = (task.attachments || []).filter((a) => a.id !== attachmentId);
-    this.saveTasks(tasks);
+    if (task && task.attachments) {
+      task.attachments = task.attachments.filter((a) => a.id !== attachmentId);
+      this.saveTasks(tasks);
+    }
     return Promise.resolve();
   }
 
   getLabels(projectId?: number): Promise<Label[]> {
     const labels = this.getStoredLabels();
-    const result = projectId ? labels.filter((l) => l.projectId === projectId) : labels;
+    const result = projectId
+      ? labels.filter((l) => l.projectId === projectId)
+      : labels;
     return Promise.resolve(result);
   }
 
@@ -257,7 +327,7 @@ class TaskService {
     const newLabel: Label = {
       id: Date.now(),
       projectId: data.projectId,
-      name: data.name.toUpperCase(),
+      name: data.name,
       colorCode: data.colorCode || '#6366f1',
     };
     labels.push(newLabel);
@@ -265,8 +335,8 @@ class TaskService {
     return Promise.resolve(newLabel);
   }
 
-  deleteLabel(labelId: number): Promise<void> {
-    const labels = this.getStoredLabels().filter((l) => l.id !== labelId);
+  deleteLabel(id: number): Promise<void> {
+    const labels = this.getStoredLabels().filter((l) => l.id !== id);
     this.saveLabels(labels);
     return Promise.resolve();
   }

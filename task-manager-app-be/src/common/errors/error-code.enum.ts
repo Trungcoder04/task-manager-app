@@ -37,7 +37,7 @@ export const ErrorCode = {
   },
   UNAUTHENTICATED: {
     code: 1006,
-    message: 'Mật khẩu không chính xác',
+    message: 'Phiên làm việc đã hết hạn, vui lòng đăng nhập lại',
     statusCode: 401,
   },
   UNAUTHORIZED: {
@@ -55,6 +55,33 @@ export const ErrorCode = {
     message: 'Địa chỉ email không đúng định dạng',
     statusCode: 400,
   },
+
+  PROJECT_NOT_FOUND: {
+    code: 1010,
+    message: "Dự án không tồn tại trên hệ thống",
+    statusCode: 404,
+  },
+
+  TASK_NOT_FOUND: {
+    code: 1011,
+    message: "Công việc không tồn tại trên hệ thống",
+    statusCode: 404,
+  },
+
+  ASSIGNEE_NOT_IN_PROJECT: {
+    code: 1012,
+    message: "Người được giao việc không phải là thành viên của dự án",
+    statusCode: 400,
+  },
+
+  NOT_PROJECT_MEMBER: {
+    code: 1013,
+    message: "Bạn không phải là thành viên của dự án",
+    statusCode: 403,
+  }
+
 } as const;
+
+
 
 export type ErrorCodeKey = keyof typeof ErrorCode;
