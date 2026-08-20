@@ -37,7 +37,7 @@ export const ErrorCode = {
   },
   UNAUTHENTICATED: {
     code: 1006,
-    message: 'Phiên làm việc đã hết hạn, vui lòng đăng nhập lại',
+    message: 'Tài khoản chưa xác thực',
     statusCode: 401,
   },
   UNAUTHORIZED: {
@@ -78,8 +78,28 @@ export const ErrorCode = {
     code: 1013,
     message: "Bạn không phải là thành viên của dự án",
     statusCode: 403,
-  }
+  },
 
+  WRONG_OLD_PASSWORD: {
+    code: 1010,
+    message: 'Password cũ sai',
+    statusCode: 400,
+  },
+  TASK_NOT_EXISTED: {
+    code: 1011,
+    message: 'Không tìm thấy công việc',
+    statusCode: 404,
+  },
+  FILE_REQUIRED: {
+    code: 1012,
+    message: 'Vui lòng chọn tệp đính kèm',
+    statusCode: 400,
+  },
+  ATTACHMENT_NOT_FOUND: {
+    code: 1013,
+    message: 'Không tìm thấy tệp đính kèm',
+    statusCode: 404,
+  },
 } as const;
 
 
