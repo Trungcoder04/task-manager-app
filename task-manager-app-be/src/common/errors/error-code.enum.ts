@@ -55,6 +55,11 @@ export const ErrorCode = {
     message: 'Địa chỉ email không đúng định dạng',
     statusCode: 400,
   },
+  WRONG_OLD_PASSWORD: {
+    code: 1010,
+    message: 'Password cũ sai',
+    statusCode: 400,
+  },
 } as const;
 
 export type ErrorCodeKey = keyof typeof ErrorCode;

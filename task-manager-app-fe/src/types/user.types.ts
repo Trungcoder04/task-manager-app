@@ -18,4 +18,5 @@ export interface UserUpdateRequest {
   password?: string;
   fullName?: string;
   email?: string;
+  oldPassword?: string;
 }

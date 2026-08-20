@@ -20,6 +20,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   user,
   onUserUpdated,
 }) => {
+  const [oldPassword, setOldPassword] = useState('')
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -33,6 +34,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
       setFullName(user.fullName);
       setEmail(user.email || '');
     }
+    setOldPassword('');
     setPassword('');
     setConfirmPassword('');
     setError('');
@@ -47,14 +49,26 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
       return;
     }
 
-    if (password && password.length < 6) {
-      setError('Mật khẩu mới phải có ít nhất 6 ký tự');
-      return;
-    }
+    if (password || oldPassword) {
+      if (!oldPassword) {
+        setError('Vui lòng nhập mật khẩu hiện tại');
+        return;
+      }
 
-    if (password && password !== confirmPassword) {
-      setError('Mật khẩu xác nhận không khớp');
-      return;
+      if (!password) {
+        setError('Vui lòng nhập mật khẩu mới');
+        return;
+      }
+
+      if (password.length < 6) {
+        setError('Mật khẩu mới phải có ít nhất 6 ký tự');
+        return;
+      }
+
+      if (password !== confirmPassword) {
+        setError('Mật khẩu xác nhận không khớp');
+        return;
+      }
     }
 
     setIsLoading(true);
@@ -64,6 +78,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
         fullName: fullName.trim(),
         email: email.trim() || undefined,
         password: password || undefined,
+        oldPassword: oldPassword || undefined,
       });
       onUserUpdated(updated);
       showToast('Cập nhật hồ sơ thành công!', 'success');
@@ -146,7 +161,14 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
           <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '0.75rem' }}>
             Đổi mật khẩu (Bỏ trống nếu không muốn đổi)
           </span>
-
+          <Input
+            label="Mật khẩu cũ"
+            type="password"
+            placeholder="••••••••"
+            value={oldPassword}
+            onChange={(e) => setOldPassword(e.target.value)}
+            disabled={isLoading}
+          />
           <Input
             label="Mật khẩu mới"
             type="password"

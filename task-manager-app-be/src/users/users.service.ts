@@ -10,7 +10,7 @@ import { Prisma, User } from '@prisma/client';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   private mapToUserResponse(user: User): UserResponse {
     return {
@@ -106,7 +106,17 @@ export class UsersService {
     }
 
     const data: Prisma.UserUpdateInput = {};
-    if (request.password) {
+    if (request.password || request.oldPassword) {
+      if (!request.oldPassword || !request.password) {
+        throw new AppException(ErrorCode.WRONG_OLD_PASSWORD);
+      }
+      const isOldPasswordValid = await bcrypt.compare(
+        request.oldPassword,
+        user.password,
+      );
+      if (!isOldPasswordValid) {
+        throw new AppException(ErrorCode.WRONG_OLD_PASSWORD);
+      }
       const salt = await bcrypt.genSalt(10);
       data.password = await bcrypt.hash(request.password, salt);
     }
