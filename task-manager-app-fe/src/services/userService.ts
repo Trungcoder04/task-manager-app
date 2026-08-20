@@ -1,57 +1,49 @@
+import { apiClient } from './apiClient';
+import { ApiResponse } from '../types/api.types';
 import { User, UserUpdateRequest } from '../types/user.types';
-import { INITIAL_USERS } from './mockData';
 
-const USERS_STORAGE_KEY = 'task_manager_all_users';
+const USER_STORAGE_KEY = 'task_manager_user';
 
 class UserService {
-  private getStoredUsers(): User[] {
-    const data = localStorage.getItem(USERS_STORAGE_KEY);
-    if (!data) {
-      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(INITIAL_USERS));
-      return INITIAL_USERS;
+  async getUsers(): Promise<User[]> {
+    const response = await apiClient.get<unknown, ApiResponse<User[]>>('/users');
+    if (response && response.result) {
+      return response.result;
     }
-    return JSON.parse(data) as User[];
+    return [];
   }
 
-  private saveUsers(users: User[]): void {
-    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
+  async getUser(id: number): Promise<User> {
+    const response = await apiClient.get<unknown, ApiResponse<User>>(`/users/${id}`);
+    if (response && response.result) {
+      return response.result;
+    }
+    throw new Error(response?.message || 'Không tìm thấy người dùng');
   }
 
-  getUsers(): Promise<User[]> {
-    return Promise.resolve(this.getStoredUsers());
-  }
+  async updateUser(id: number, data: UserUpdateRequest): Promise<User> {
+    const response = await apiClient.put<unknown, ApiResponse<User>>(`/users/${id}`, data);
+    
+    if (response && response.result) {
+      const updatedUser = response.result;
 
-  getUser(id: number): Promise<User> {
-    const users = this.getStoredUsers();
-    const user = users.find((u) => u.id === id);
-    if (!user) return Promise.reject(new Error('User not found'));
-    return Promise.resolve(user);
-  }
-
-  updateUser(id: number, data: UserUpdateRequest): Promise<User> {
-    const users = this.getStoredUsers();
-    const index = users.findIndex((u) => u.id === id);
-    if (index === -1) return Promise.reject(new Error('User not found'));
-
-    const updatedUser: User = {
-      ...users[index],
-      fullName: data.fullName ?? users[index].fullName,
-      email: data.email ?? users[index].email,
-    };
-
-    users[index] = updatedUser;
-    this.saveUsers(users);
-
-    // Also update current active user session if matched
-    const currentUser = localStorage.getItem('task_manager_user');
-    if (currentUser) {
-      const parsed = JSON.parse(currentUser) as User;
-      if (parsed.id === id) {
-        localStorage.setItem('task_manager_user', JSON.stringify(updatedUser));
+      // Giữ nguyên logic update lại thông tin session nếu người dùng đang tự sửa profile của chính mình
+      const currentUserStr = localStorage.getItem(USER_STORAGE_KEY);
+      if (currentUserStr) {
+        const currentUser = JSON.parse(currentUserStr) as User;
+        if (currentUser.id === id) {
+          // Lưu lại thông tin mới nhất vào localStorage để Header/Sidebar cập nhật ngay lập tức
+          localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updatedUser));
+        }
       }
-    }
 
-    return Promise.resolve(updatedUser);
+      return updatedUser;
+    }
+    throw new Error(response?.message || 'Cập nhật thông tin thất bại');
+  }
+
+  async deleteUser(id: number): Promise<void> {
+    await apiClient.delete<unknown, ApiResponse<void>>(`/users/${id}`);
   }
 }
 
