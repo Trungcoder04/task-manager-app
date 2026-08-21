@@ -3,22 +3,29 @@ import { TaskComment } from '../../types/comment.types';
 import { taskCommentService } from '../../services/taskCommentService';
 import { Avatar } from '../common/Avatar';
 import { Button } from '../common/Button';
+import { Icon } from '../common/Icon';
 import { LoadingSpinner } from '../common/LoadingSpinner';
 
 interface TaskCommentsProps {
   taskId?: number;
+  currentUserId?: number;
   comments?: TaskComment[];
   onAddComment?: (content: string) => Promise<unknown>;
+  onDeleteComment?: (commentId: number) => Promise<unknown>;
   onCountChange?: (count: number) => void;
 }
 
 export const TaskComments: React.FC<TaskCommentsProps> = ({
   taskId,
+  currentUserId,
   comments: initialComments,
   onAddComment,
+  onDeleteComment,
   onCountChange,
 }) => {
-  const [comments, setComments] = useState<TaskComment[]>(initialComments || []);
+  const [comments, setComments] = useState<TaskComment[]>(
+    initialComments || [],
+  );
   const [content, setContent] = useState('');
   const [isFetching, setIsFetching] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -54,8 +61,12 @@ export const TaskComments: React.FC<TaskCommentsProps> = ({
     try {
       if (onAddComment) {
         await onAddComment(content.trim());
+        void fetchComments();
       } else if (taskId) {
-        const newCmt = await taskCommentService.addComment(taskId, content.trim());
+        const newCmt = await taskCommentService.addComment(
+          taskId,
+          content.trim(),
+        );
         setComments((prev) => {
           const updated = [...prev, newCmt];
           onCountChange?.(updated.length);
@@ -65,6 +76,24 @@ export const TaskComments: React.FC<TaskCommentsProps> = ({
       setContent('');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (commentId: number) => {
+    if (!confirm('Bạn có chắc chắn muốn xóa bình luận này?')) return;
+    try {
+      if (onDeleteComment) {
+        await onDeleteComment(commentId);
+      } else if (taskId) {
+        await taskCommentService.deleteComment(taskId, commentId);
+      }
+      setComments((prev) => {
+        const updated = prev.filter((c) => c.id !== commentId);
+        onCountChange?.(updated.length);
+        return updated;
+      });
+    } catch (err) {
+      console.warn('Lỗi khi xóa bình luận:', err);
     }
   };
 
@@ -81,7 +110,10 @@ export const TaskComments: React.FC<TaskCommentsProps> = ({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       {/* Form viết bình luận */}
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      <form
+        onSubmit={handleSubmit}
+        style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}
+      >
         <textarea
           className="form-textarea"
           rows={3}
@@ -109,11 +141,20 @@ export const TaskComments: React.FC<TaskCommentsProps> = ({
           <LoadingSpinner text="Đang tải bình luận..." />
         </div>
       ) : comments.length === 0 ? (
-        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+        <div
+          style={{
+            padding: '2rem',
+            textAlign: 'center',
+            color: 'var(--text-muted)',
+            fontSize: '0.875rem',
+          }}
+        >
           Chưa có bình luận nào. Hãy bắt đầu cuộc trao đổi!
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <div
+          style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}
+        >
           {comments.map((cmt) => (
             <div
               key={cmt.id}
@@ -133,15 +174,66 @@ export const TaskComments: React.FC<TaskCommentsProps> = ({
                 size="sm"
               />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                  <span style={{ fontSize: '0.845rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                    {cmt.user?.fullName || cmt.user?.username || 'User'}
-                  </span>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    {formatTime(cmt.createdAt)}
-                  </span>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '0.25rem',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: '0.845rem',
+                        fontWeight: 700,
+                        color: 'var(--text-primary)',
+                      }}
+                    >
+                      {cmt.user?.fullName || cmt.user?.username || 'User'}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: '0.75rem',
+                        color: 'var(--text-muted)',
+                      }}
+                    >
+                      {formatTime(cmt.createdAt)}
+                    </span>
+                  </div>
+
+                  {(currentUserId === undefined ||
+                    currentUserId === cmt.userId) && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-icon"
+                      style={{
+                        padding: '0.1rem 0.3rem',
+                        color: 'var(--priority-high)',
+                      }}
+                      onClick={() => void handleDelete(cmt.id)}
+                      title="Xóa bình luận"
+                    >
+                      <Icon name="trash" size={14} />
+                    </button>
+                  )}
                 </div>
-                <p style={{ fontSize: '0.845rem', color: 'var(--text-secondary)', lineHeight: 1.45, whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: 0 }}>
+                <p
+                  style={{
+                    fontSize: '0.845rem',
+                    color: 'var(--text-secondary)',
+                    lineHeight: 1.45,
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                    margin: 0,
+                  }}
+                >
                   {cmt.content}
                 </p>
               </div>
