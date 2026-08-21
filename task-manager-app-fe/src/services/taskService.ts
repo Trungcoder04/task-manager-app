@@ -421,6 +421,26 @@ class TaskService {
     const labels = this.getStoredLabels().filter((l) => l.id !== id);
     this.saveLabels(labels);
   }
+
+  async getDashboardStats(projectId: number) {
+    try {
+      const response = await apiClient.get<unknown, ApiResponse<any>>(
+        `/projects/${projectId}/dashboard`,
+      );
+      if (response && response.result) {
+        return response.result;
+      }
+      if (response && typeof response === 'object' && 'totalTasks' in response) {
+        return response;
+      }
+    } catch (err) {
+      console.warn(
+        'API getDashboardStats failed, falling back to local:',
+        err,
+      );
+    }
+    return null;
+  }
 }
 
 export const taskService = new TaskService();

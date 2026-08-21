@@ -40,6 +40,15 @@ export class TasksController {
         return this.tasksService.getProjectTasks(projectId, userId, query);
     }
 
+    // API thong ke Dashboard theo project
+    @Get('projects/:projectId/dashboard')
+    async getDashboardStats(
+        @Param('projectId', ParseIntPipe) projectId: number,
+        @CurrentUser('userId') userId: number,
+    ) {
+        return this.tasksService.getDashboardStats(projectId, userId);
+    }
+
     // API xem chi tiet 1 task
     @Get('tasks/:id')
     async getTaskById(

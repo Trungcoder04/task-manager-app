@@ -63,7 +63,6 @@ export const AppLayout: React.FC = () => {
 
   const handleSelectTaskFromDashboard = (task: Task) => {
     setSelectedTaskForDrawer(task);
-    setActiveTab('board');
   };
 
   return (
@@ -88,15 +87,35 @@ export const AppLayout: React.FC = () => {
 
         <main className="content-body">
           {activeTab === 'dashboard' && (
-            <DashboardPage
-              project={activeProject}
-              tasks={tasks}
-              isLoading={isProjectsLoading || isTasksLoading}
-              error={projectsError || tasksError}
-              onSelectTask={handleSelectTaskFromDashboard}
-              onGoToBoard={() => setActiveTab('board')}
-              onGoToProjects={() => setActiveTab('projects')}
-            />
+            <>
+              <DashboardPage
+                project={activeProject}
+                tasks={tasks}
+                isLoading={isProjectsLoading || isTasksLoading}
+                error={projectsError || tasksError}
+                onSelectTask={handleSelectTaskFromDashboard}
+                onGoToBoard={() => setActiveTab('board')}
+                onGoToProjects={() => setActiveTab('projects')}
+              />
+
+              {activeProject && selectedTaskForDrawer && (
+                <TaskModal
+                  isOpen={!!selectedTaskForDrawer}
+                  onClose={() => setSelectedTaskForDrawer(null)}
+                  task={selectedTaskForDrawer}
+                  projectId={activeProject.id}
+                  members={projectMembers}
+                  labels={labels}
+                  onCreateTask={createTask}
+                  onUpdateTask={updateTask}
+                  onDeleteTask={deleteTask}
+                  onAddComment={addComment}
+                  onAddAttachment={addAttachment}
+                  onUploadAttachment={uploadAttachment}
+                  onDeleteAttachment={deleteAttachment}
+                />
+              )}
+            </>
           )}
 
           {activeTab === 'board' && (

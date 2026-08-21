@@ -612,4 +612,71 @@ export class TasksService {
 
     return 'Task deleted successfully';
   }
+
+  /**
+   * Thống kê Dashboard theo Project (Task F04)
+   */
+  async getDashboardStats(projectId: number, currentUserId: number) {
+    const isMember = await this.isUserInProject(projectId, currentUserId);
+    if (!isMember) {
+      throw new AppException(ErrorCode.NOT_PROJECT_MEMBER);
+    }
+
+    const tasks = await this.prisma.task.findMany({
+      where: { projectId },
+      orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
+      include: {
+        assignee: {
+          select: {
+            id: true,
+            username: true,
+            fullName: true,
+            email: true,
+            avatar: true,
+          },
+        },
+        taskLabels: {
+          include: {
+            label: true,
+          },
+        },
+      },
+    });
+
+    const formattedTasks = tasks.map((t) => ({
+      ...t,
+      labels: t.taskLabels ? t.taskLabels.map((tl) => tl.label) : [],
+    }));
+
+    const totalTasks = formattedTasks.length;
+    const todoTasks = formattedTasks.filter((t) => t.status === 1).length;
+    const doingTasks = formattedTasks.filter((t) => t.status === 2).length;
+    const doneTasks = formattedTasks.filter((t) => t.status === 3).length;
+    const highPriorityTasks = formattedTasks.filter(
+      (t) => t.priority === 3,
+    ).length;
+
+    const now = new Date();
+    const overdueTasks = formattedTasks.filter(
+      (t) => t.dueDate && new Date(t.dueDate) < now && t.status !== 3,
+    ).length;
+
+    const completionRate =
+      totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
+
+    const upcomingTasks = formattedTasks
+      .filter((t) => t.dueDate && t.status !== 3)
+      .slice(0, 5);
+
+    return {
+      totalTasks,
+      todoTasks,
+      doingTasks,
+      doneTasks,
+      highPriorityTasks,
+      overdueTasks,
+      completionRate,
+      upcomingTasks,
+    };
+  }
 }
