@@ -241,11 +241,47 @@ class TaskService {
     this.saveTasks(tasks);
   }
 
-  addComment(
+  async getComments(taskId: number): Promise<TaskComment[]> {
+    try {
+      const response = await apiClient.get<unknown, ApiResponse<TaskComment[]>>(
+        `/tasks/${taskId}/comments`,
+      );
+      if (response && Array.isArray(response.result)) {
+        return response.result;
+      }
+      if (Array.isArray(response)) {
+        return response;
+      }
+    } catch (err) {
+      console.warn('API getComments failed, falling back to local:', err);
+    }
+    const tasks = this.getStoredTasks();
+    const task = tasks.find((t) => t.id === taskId);
+    return task?.comments || [];
+  }
+
+  async addComment(
     taskId: number,
     userId: number,
     content: string,
   ): Promise<TaskComment> {
+    try {
+      const response = await apiClient.post<unknown, ApiResponse<TaskComment>>(
+        `/tasks/${taskId}/comments`,
+        { content },
+      );
+      if (response && response.result) {
+        return response.result;
+      }
+      if (response && (response as unknown as TaskComment).id) {
+        return response as unknown as TaskComment;
+      }
+    } catch (err) {
+      if (err instanceof Error) {
+        throw err;
+      }
+    }
+
     const tasks = this.getStoredTasks();
     const task = tasks.find((t) => t.id === taskId);
     if (!task) return Promise.reject(new Error('Task không tồn tại'));
@@ -263,17 +299,22 @@ class TaskService {
 
     task.comments = [...(task.comments || []), newComment];
     this.saveTasks(tasks);
-    return Promise.resolve(newComment);
+    return newComment;
   }
 
-  deleteComment(commentId: number, taskId: number): Promise<void> {
+  async deleteComment(commentId: number, taskId: number): Promise<void> {
+    try {
+      await apiClient.delete(`/tasks/${taskId}/comments/${commentId}`);
+      return;
+    } catch (err) {
+      console.warn('API deleteComment failed, falling back to local:', err);
+    }
     const tasks = this.getStoredTasks();
     const task = tasks.find((t) => t.id === taskId);
     if (task && task.comments) {
       task.comments = task.comments.filter((c) => c.id !== commentId);
       this.saveTasks(tasks);
     }
-    return Promise.resolve();
   }
 
   addAttachment(
