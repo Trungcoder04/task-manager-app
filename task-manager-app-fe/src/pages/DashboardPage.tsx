@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Project } from '../types/project.types';
 import { Task } from '../types/task.types';
 import { StatCard } from '../components/dashboard/StatCard';
@@ -8,6 +8,18 @@ import { RecentActivities } from '../components/dashboard/RecentActivities';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { EmptyState } from '../components/common/EmptyState';
 import { Button } from '../components/common/Button';
+import { taskService } from '../services/taskService';
+
+interface DashboardStats {
+  totalTasks: number;
+  todoTasks: number;
+  doingTasks: number;
+  doneTasks: number;
+  highPriorityTasks: number;
+  overdueTasks: number;
+  completionRate: number;
+  upcomingTasks?: Task[];
+}
 
 interface DashboardPageProps {
   project: Project | null;
@@ -28,6 +40,16 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   onGoToBoard,
   onGoToProjects,
 }) => {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+
+  useEffect(() => {
+    if (project?.id) {
+      void taskService.getDashboardStats(project.id).then((data) => {
+        if (data) setStats(data);
+      });
+    }
+  }, [project?.id, tasks]);
+
   // 1. Loading State
   if (isLoading) {
     return <LoadingSpinner text="Đang tải dữ liệu tổng quan..." />;
@@ -37,7 +59,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   if (error) {
     return (
       <div style={{ padding: '2rem', textAlign: 'center' }}>
-        <div style={{ color: 'var(--priority-high)', marginBottom: '1rem', fontWeight: 600 }}>
+        <div
+          style={{
+            color: 'var(--priority-high)',
+            marginBottom: '1rem',
+            fontWeight: 600,
+          }}
+        >
           {error}
         </div>
         <Button variant="secondary" onClick={() => window.location.reload()}>
@@ -63,23 +91,37 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     );
   }
 
-  const totalTasks = tasks.length;
-  const todoTasks = tasks.filter((t) => t.status === 1).length;
-  const doingTasks = tasks.filter((t) => t.status === 2).length;
-  const doneTasks = tasks.filter((t) => t.status === 3).length;
-
-  const completionRate = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
+  const totalTasks = stats?.totalTasks ?? tasks.length;
+  const todoTasks =
+    stats?.todoTasks ?? tasks.filter((t) => t.status === 1).length;
+  const doingTasks =
+    stats?.doingTasks ?? tasks.filter((t) => t.status === 2).length;
+  const doneTasks =
+    stats?.doneTasks ?? tasks.filter((t) => t.status === 3).length;
+  const completionRate =
+    stats?.completionRate ??
+    (totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0);
+  const upcomingList = stats?.upcomingTasks || tasks;
 
   return (
     <div className="dashboard-page">
       {/* Page Title & Project Info */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '1rem',
+        }}
+      >
         <div>
           <h2 style={{ fontSize: '1.5rem', fontWeight: 800 }}>
             Dashboard: {project.name}
           </h2>
           <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-            Theo dõi tiến độ, phân bổ công việc và hoạt động của nhóm trong dự án.
+            Theo dõi tiến độ, phân bổ công việc và hoạt động của nhóm trong dự
+            án.
           </p>
         </div>
 
@@ -123,7 +165,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       {/* Progress Banner */}
       <div
         style={{
-          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(139, 92, 246, 0.08))',
+          background:
+            'linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(139, 92, 246, 0.08))',
           border: '1px solid var(--border-color)',
           borderRadius: 'var(--radius-xl)',
           padding: '1.25rem 1.5rem',
@@ -134,8 +177,23 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           gap: '1rem',
         }}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1, minWidth: '240px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', fontWeight: 700 }}>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.25rem',
+            flex: 1,
+            minWidth: '240px',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              fontSize: '0.875rem',
+              fontWeight: 700,
+            }}
+          >
             <span>Tiến độ hoàn thành dự án</span>
             <span>{completionRate}%</span>
           </div>
@@ -144,7 +202,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
               className="progress-fill"
               style={{
                 width: `${completionRate}%`,
-                background: 'linear-gradient(90deg, var(--primary-500), var(--accent-emerald))',
+                background:
+                  'linear-gradient(90deg, var(--primary-500), var(--accent-emerald))',
               }}
             />
           </div>
@@ -154,7 +213,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       {/* Detailed Columns: Priority + Upcoming Deadlines */}
       <div className="dashboard-details-grid">
         <PriorityChart tasks={tasks} />
-        <UpcomingTasks tasks={tasks} onSelectTask={onSelectTask} />
+        <UpcomingTasks tasks={upcomingList} onSelectTask={onSelectTask} />
       </div>
 
       {/* Recent Activities Feed */}
