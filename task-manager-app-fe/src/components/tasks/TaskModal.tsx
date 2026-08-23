@@ -4,6 +4,7 @@ import { User } from '../../types/user.types';
 import { Label } from '../../types/label.types';
 import { Button } from '../common/Button';
 import { Icon } from '../common/Icon';
+import { ConfirmModal } from '../common/ConfirmModal';
 import { TaskComments } from './TaskComments';
 import { TaskAttachments } from './TaskAttachments';
 import { TaskActivities } from './TaskActivities';
@@ -51,6 +52,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const [isSelectingLabels, setIsSelectingLabels] = useState(false);
   const [activeTab, setActiveTab] = useState<'comments' | 'attachments' | 'activities'>('comments');
   const [isLoading, setIsLoading] = useState(false);
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
 
   const [commentsCount, setCommentsCount] = useState<number>(0);
   const [attachmentsCount, setAttachmentsCount] = useState<number>(0);
@@ -223,12 +225,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                 variant="danger"
                 size="icon"
                 icon="trash"
-                onClick={() => {
-                  if (confirm('Bạn có chắc chắn muốn xóa công việc này?')) {
-                    void onDeleteTask(task.id);
-                    onClose();
-                  }
-                }}
+                onClick={() => setIsConfirmDeleteOpen(true)}
                 title="Xóa công việc"
               />
             )}
@@ -604,6 +601,20 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           )}
         </div>
       </div>
+
+      {isEditing && task && (
+        <ConfirmModal
+          isOpen={isConfirmDeleteOpen}
+          onClose={() => setIsConfirmDeleteOpen(false)}
+          onConfirm={async () => {
+            await onDeleteTask(task.id);
+            onClose();
+          }}
+          title="Xóa công việc"
+          message={`Bạn có chắc chắn muốn xóa công việc #${task.id} "${task.title}"? Hành động này không thể hoàn tác.`}
+          confirmText="Xóa công việc"
+        />
+      )}
     </div>
   );
 };

@@ -4,6 +4,7 @@ import { taskAttachmentService } from '../../services/taskAttachmentService';
 import { Icon } from '../common/Icon';
 import { Button } from '../common/Button';
 import { LoadingSpinner } from '../common/LoadingSpinner';
+import { ConfirmModal } from '../common/ConfirmModal';
 
 interface TaskAttachmentsProps {
   taskId?: number;
@@ -32,6 +33,7 @@ export const TaskAttachments: React.FC<TaskAttachmentsProps> = ({
   const [manualFileUrl, setManualFileUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  const [deletingAtt, setDeletingAtt] = useState<{ id: number; fileName: string } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -520,16 +522,7 @@ export const TaskAttachments: React.FC<TaskAttachmentsProps> = ({
                       type="button"
                       className="btn btn-ghost btn-icon"
                       style={{ color: 'var(--priority-high)' }}
-                      onClick={async () => {
-                        if (confirm(`Bạn có chắc muốn xóa tệp "${att.fileName}"?`)) {
-                          await onDeleteAttachment(att.id);
-                          setAttachmentList((prev) => {
-                            const updated = prev.filter((a) => a.id !== att.id);
-                            onCountChange?.(updated.length);
-                            return updated;
-                          });
-                        }
-                      }}
+                      onClick={() => setDeletingAtt({ id: att.id, fileName: att.fileName })}
                       title="Xóa tệp đính kèm"
                     >
                       <Icon name="trash" size={16} />
@@ -541,6 +534,24 @@ export const TaskAttachments: React.FC<TaskAttachmentsProps> = ({
           )}
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={deletingAtt !== null}
+        onClose={() => setDeletingAtt(null)}
+        onConfirm={async () => {
+          if (deletingAtt) {
+            await onDeleteAttachment(deletingAtt.id);
+            setAttachmentList((prev) => {
+              const updated = prev.filter((a) => a.id !== deletingAtt.id);
+              onCountChange?.(updated.length);
+              return updated;
+            });
+          }
+        }}
+        title="Xóa tệp đính kèm"
+        message={`Bạn có chắc chắn muốn xóa tệp "${deletingAtt?.fileName}"? Hành động này không thể hoàn tác.`}
+        confirmText="Xóa tệp"
+      />
     </div>
   );
 };
