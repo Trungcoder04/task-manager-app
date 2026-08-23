@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Project } from '../../types/project.types';
 import { Avatar } from '../common/Avatar';
 import { Button } from '../common/Button';
+import { ConfirmModal } from '../common/ConfirmModal';
 
 interface ProjectCardProps {
   project: Project;
@@ -20,6 +21,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
   onDelete,
   onManageMembers,
 }) => {
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   return (
     <div
       style={{
@@ -134,15 +136,20 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
             variant="danger"
             size="icon"
             icon="trash"
-            onClick={() => {
-              if (confirm(`Bạn có chắc muốn xóa dự án "${project.name}"?`)) {
-                onDelete(project.id);
-              }
-            }}
+            onClick={() => setIsConfirmDeleteOpen(true)}
             title="Xóa dự án"
           />
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={isConfirmDeleteOpen}
+        onClose={() => setIsConfirmDeleteOpen(false)}
+        onConfirm={() => onDelete(project.id)}
+        title="Xóa dự án"
+        message={`Bạn có chắc chắn muốn xóa dự án "${project.name}"? Tất cả các công việc, nhãn dán và dữ liệu liên quan sẽ bị xóa vĩnh viễn.`}
+        confirmText="Xóa dự án"
+      />
     </div>
   );
 };

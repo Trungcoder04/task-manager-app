@@ -5,6 +5,7 @@ import { Avatar } from '../common/Avatar';
 import { Button } from '../common/Button';
 import { Icon } from '../common/Icon';
 import { LoadingSpinner } from '../common/LoadingSpinner';
+import { ConfirmModal } from '../common/ConfirmModal';
 
 interface TaskCommentsProps {
   taskId?: number;
@@ -29,6 +30,7 @@ export const TaskComments: React.FC<TaskCommentsProps> = ({
   const [content, setContent] = useState('');
   const [isFetching, setIsFetching] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingCommentId, setDeletingCommentId] = useState<number | null>(null);
 
   const fetchComments = useCallback(async () => {
     if (!taskId) return;
@@ -79,8 +81,7 @@ export const TaskComments: React.FC<TaskCommentsProps> = ({
     }
   };
 
-  const handleDelete = async (commentId: number) => {
-    if (!confirm('Bạn có chắc chắn muốn xóa bình luận này?')) return;
+  const executeDelete = async (commentId: number) => {
     try {
       if (onDeleteComment) {
         await onDeleteComment(commentId);
@@ -217,7 +218,7 @@ export const TaskComments: React.FC<TaskCommentsProps> = ({
                         padding: '0.1rem 0.3rem',
                         color: 'var(--priority-high)',
                       }}
-                      onClick={() => void handleDelete(cmt.id)}
+                      onClick={() => setDeletingCommentId(cmt.id)}
                       title="Xóa bình luận"
                     >
                       <Icon name="trash" size={14} />
@@ -241,6 +242,17 @@ export const TaskComments: React.FC<TaskCommentsProps> = ({
           ))}
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={deletingCommentId !== null}
+        onClose={() => setDeletingCommentId(null)}
+        onConfirm={() => {
+          if (deletingCommentId) void executeDelete(deletingCommentId);
+        }}
+        title="Xóa bình luận"
+        message="Bạn có chắc chắn muốn xóa bình luận này? Hành động này không thể hoàn tác."
+        confirmText="Xóa bình luận"
+      />
     </div>
   );
 };

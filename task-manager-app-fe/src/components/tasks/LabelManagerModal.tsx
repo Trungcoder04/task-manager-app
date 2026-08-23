@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
 import { Icon } from '../common/Icon';
+import { ConfirmModal } from '../common/ConfirmModal';
 import { Label, CreateLabelRequest } from '../../types/label.types';
 
 interface LabelManagerModalProps {
@@ -33,6 +34,7 @@ export const LabelManagerModal: React.FC<LabelManagerModalProps> = ({
 }) => {
   const [name, setName] = useState('');
   const [selectedColor, setSelectedColor] = useState(PRESET_COLORS[0]);
+  const [deletingLabel, setDeletingLabel] = useState<Label | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -160,7 +162,7 @@ export const LabelManagerModal: React.FC<LabelManagerModalProps> = ({
                   <button
                     className="btn btn-ghost btn-icon"
                     style={{ color: 'var(--priority-high)' }}
-                    onClick={() => onDeleteLabel(l.id)}
+                    onClick={() => setDeletingLabel(l)}
                     title="Xóa nhãn"
                   >
                     <Icon name="trash" size={16} />
@@ -171,6 +173,19 @@ export const LabelManagerModal: React.FC<LabelManagerModalProps> = ({
           </div>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={deletingLabel !== null}
+        onClose={() => setDeletingLabel(null)}
+        onConfirm={async () => {
+          if (deletingLabel) {
+            await onDeleteLabel(deletingLabel.id);
+          }
+        }}
+        title="Xóa nhãn dán"
+        message={`Bạn có chắc chắn muốn xóa nhãn "${deletingLabel?.name}"? Nhãn này sẽ bị gỡ khỏi tất cả các công việc liên quan.`}
+        confirmText="Xóa nhãn"
+      />
     </Modal>
   );
 };
