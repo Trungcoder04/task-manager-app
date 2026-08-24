@@ -110,6 +110,21 @@ export const ErrorCode = {
     message: 'Tài khoản của bạn đã bị vô hiệu hóa.',
     statusCode: 403,
   },
+  FORBIDDEN_TRANSITION: {
+    code: 1020,
+    message: 'Bạn không có quyền thực hiện chuyển đổi trạng thái này',
+    statusCode: 403,
+  },
+  INVALID_STATUS_TRANSITION: {
+    code: 1021,
+    message: 'Không thể chuyển đổi trạng thái từ {from} sang {to}',
+    statusCode: 400,
+  },
+  TASK_MUST_BE_PENDING_FOR_MEMBER: {
+    code: 1022,
+    message: 'Thành viên (Member) chỉ được phép tạo công việc ở trạng thái PENDING',
+    statusCode: 400,
+  },
 } as const;
 
 

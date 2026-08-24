@@ -2,7 +2,7 @@ import React, { ButtonHTMLAttributes, ReactNode } from 'react';
 import { Icon, IconName } from './Icon';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'success';
   size?: 'sm' | 'md' | 'icon';
   icon?: IconName;
   iconPosition?: 'left' | 'right';
@@ -19,6 +19,7 @@ export const Button: React.FC<ButtonProps> = ({
   children,
   className = '',
   disabled,
+  type = 'button',
   ...props
 }) => {
   const btnClass = `btn btn-${variant} ${size === 'sm' ? 'btn-sm' : ''} ${
@@ -26,7 +27,7 @@ export const Button: React.FC<ButtonProps> = ({
   } ${className}`.trim();
 
   return (
-    <button className={btnClass} disabled={disabled || isLoading} {...props}>
+    <button className={btnClass} type={type} disabled={disabled || isLoading} {...props}>
       {isLoading && <span className="spinner" style={{ width: 14, height: 14 }} />}
       {!isLoading && icon && iconPosition === 'left' && <Icon name={icon} size={16} />}
       {children}

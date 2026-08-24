@@ -6,6 +6,7 @@ import { Button } from '../common/Button';
 interface TaskColumnProps {
   title: string;
   status: TaskStatusType;
+  color?: string;
   tasks: Task[];
   onSelectTask: (task: Task) => void;
   onDropTask: (taskId: number, newStatus: TaskStatusType) => void;
@@ -15,18 +16,13 @@ interface TaskColumnProps {
 export const TaskColumn: React.FC<TaskColumnProps> = ({
   title,
   status,
+  color,
   tasks,
   onSelectTask,
   onDropTask,
   onQuickAdd,
 }) => {
   const [isDragOver, setIsDragOver] = useState(false);
-
-  const getDotClass = () => {
-    if (status === 1) return 'status-dot-todo';
-    if (status === 2) return 'status-dot-doing';
-    return 'status-dot-done';
-  };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -56,7 +52,7 @@ export const TaskColumn: React.FC<TaskColumnProps> = ({
     <div className="kanban-column">
       <div className="column-header">
         <div className="column-title-wrap">
-          <div className={`status-dot ${getDotClass()}`} />
+          <div className="status-dot" style={{ backgroundColor: color || 'var(--primary-500)' }} />
           <span className="column-title">{title}</span>
           <span className="column-badge">{tasks.length}</span>
         </div>

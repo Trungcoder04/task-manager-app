@@ -27,7 +27,10 @@ export type IconName =
   | 'chevron-right'
   | 'download'
   | 'camera'
-  | 'upload';
+  | 'upload'
+  | 'play'
+  | 'send'
+  | 'refresh';
 
 interface IconProps {
   name: IconName;
@@ -194,6 +197,24 @@ export const Icon: React.FC<IconProps> = ({
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="17 8 12 3 7 8" />
             <line x1="12" x2="12" y1="3" y2="15" />
+          </>
+        );
+      case 'play':
+        return <polygon points="6 3 20 12 6 21 6 3" fill="currentColor" />;
+      case 'send':
+        return (
+          <>
+            <line x1="22" y1="2" x2="11" y2="13" />
+            <polygon points="22 2 15 22 11 13 2 9 22 2" />
+          </>
+        );
+      case 'refresh':
+        return (
+          <>
+            <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+            <path d="M3 3v5h5" />
+            <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+            <path d="M16 16h5v5" />
           </>
         );
       default:

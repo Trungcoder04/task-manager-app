@@ -22,9 +22,9 @@ export class UpdateTaskDto {
 
   @IsInt()
   @IsOptional()
-  @Min(1)
-  @Max(3)
-  status?: number;
+  @Min(0)
+  @Max(5)
+  status?: number; // 0: PENDING, 1: TODO, 2: IN_PROGRESS, 3: IN_REVIEW, 4: DONE, 5: REJECTED
 
   @IsInt()
   @IsOptional()

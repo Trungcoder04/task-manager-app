@@ -57,12 +57,12 @@
 /* Kanban Columns Grid */
 .kanban-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(280px, 1fr));
+  grid-template-columns: repeat(6, minmax(270px, 1fr));
   gap: 0.75rem;
   flex: 1;
   min-height: 0;
   overflow-x: auto;
-  padding-bottom: 0.5rem;
+  padding-bottom: 0.75rem;
 }
 
 .kanban-column {
@@ -97,9 +97,12 @@
   border-radius: var(--radius-full);
 }
 
-.status-dot-todo { background: var(--status-todo); }
-.status-dot-doing { background: var(--status-doing); }
-.status-dot-done { background: var(--status-done); }
+.status-dot-pending { background: #f59e0b; }
+.status-dot-todo { background: #6366f1; }
+.status-dot-in-progress { background: #3b82f6; }
+.status-dot-in-review { background: #8b5cf6; }
+.status-dot-done { background: #10b981; }
+.status-dot-rejected { background: #ef4444; }
 
 .column-title {
   font-weight: 700;

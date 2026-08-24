@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Project } from '../types/project.types';
+import { Project, ProjectMemberRoleType } from '../types/project.types';
 import {
   Task,
   TaskFilterOptions,
@@ -24,10 +24,12 @@ interface BoardPageProps {
   filters: TaskFilterOptions;
   isLoading: boolean;
   error: string | null;
+  userRole?: ProjectMemberRoleType;
   onFilterChange: (filters: TaskFilterOptions) => void;
   onMoveTask: (taskId: number, newStatus: TaskStatusType) => void;
   onCreateTask: (data: CreateTaskRequest) => Promise<unknown>;
   onUpdateTask: (id: number, data: UpdateTaskRequest) => Promise<unknown>;
+  onUpdateStatus?: (taskId: number, newStatus: TaskStatusType, note?: string) => Promise<unknown>;
   onDeleteTask: (id: number) => Promise<void>;
   onAddComment: (taskId: number, content: string) => Promise<unknown>;
   onAddAttachment: (taskId: number, fileName: string, fileUrl: string) => Promise<unknown>;
@@ -42,15 +44,18 @@ interface BoardPageProps {
 
 export const BoardPage: React.FC<BoardPageProps> = ({
   project,
+  tasks = [],
   filteredTasks,
   labels,
   filters,
   isLoading,
   error,
+  userRole,
   onFilterChange,
   onMoveTask,
   onCreateTask,
   onUpdateTask,
+  onUpdateStatus,
   onDeleteTask,
   onAddComment,
   onAddAttachment,
@@ -67,7 +72,11 @@ export const BoardPage: React.FC<BoardPageProps> = ({
   const [initialColumnStatus, setInitialColumnStatus] = useState<TaskStatusType>(1);
   const [isLabelModalOpen, setIsLabelModalOpen] = useState(false);
 
-  const activeTask = externalSelectedTask || internalSelectedTask;
+  const activeTaskId = externalSelectedTask?.id || internalSelectedTask?.id;
+  const activeTask =
+    (activeTaskId ? tasks.find((t) => t.id === activeTaskId) : null) ||
+    externalSelectedTask ||
+    internalSelectedTask;
 
   if (isLoading) {
     return <LoadingSpinner text="Đang tải dữ liệu Bảng Kanban..." />;
@@ -151,8 +160,10 @@ export const BoardPage: React.FC<BoardPageProps> = ({
         members={projectMembers}
         labels={labels}
         initialStatus={initialColumnStatus}
+        userRole={userRole}
         onCreateTask={onCreateTask}
         onUpdateTask={onUpdateTask}
+        onUpdateStatus={onUpdateStatus}
         onDeleteTask={onDeleteTask}
         onAddComment={onAddComment}
         onAddAttachment={onAddAttachment}

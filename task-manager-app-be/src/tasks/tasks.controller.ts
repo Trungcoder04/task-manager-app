@@ -8,6 +8,7 @@ import {
     Param,
     Query,
     ParseIntPipe,
+    Patch,
 } from '@nestjs/common';
 
 import { TasksService } from './tasks.service';
@@ -16,7 +17,7 @@ import { UpdateTaskDto } from './dto/update-task.dto';
 import { TaskQueryDto } from './dto/task-query.dto';
 import { TaskResponse } from './dto/task-response.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { TaskActivity } from 'src/common/task-activity/task-activity.decorator';
+import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
 
 @Controller()
 export class TasksController {
@@ -24,11 +25,21 @@ export class TasksController {
 
     // API tao task moi
     @Post('tasks')
-    @TaskActivity('Tạo công việc mới')
     async createTask(
         @CurrentUser('userId') userId: number,
-        @Body() dto: CreateTaskDto,): Promise<TaskResponse> {
+        @Body() dto: CreateTaskDto,
+    ) {
         return this.tasksService.createTask(userId, dto);
+    }
+
+    // API cap nhat trang thai task
+    @Patch('tasks/:id/status')
+    async updateTaskStatus(
+        @Param('id', ParseIntPipe) taskId: number,
+        @CurrentUser('userId') userId: number,
+        @Body() dto: UpdateTaskStatusDto,
+    ) {
+        return this.tasksService.updateTaskStatus(taskId, userId, dto);
     }
 
     // Lay danh sach task cua project

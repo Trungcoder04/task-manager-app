@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Task } from '../../types/task.types';
+import { Task, TaskStatus } from '../../types/task.types';
 import { Badge } from '../common/Badge';
 import { Avatar } from '../common/Avatar';
 import { Icon } from '../common/Icon';
@@ -32,18 +32,47 @@ export const TaskCard: React.FC<TaskCardProps> = ({
     return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
   };
 
-  const isOverdue = task.dueDate && new Date(task.dueDate).getTime() < Date.now() && task.status !== 3;
+  const isOverdue =
+    task.dueDate &&
+    new Date(task.dueDate).getTime() < Date.now() &&
+    task.status !== TaskStatus.DONE;
+
+  const isReworked =
+    task.status === TaskStatus.TODO &&
+    (task.activities?.some((a) => a.action.toLowerCase().includes('làm lại')) || false);
 
   return (
     <div
       className={`task-card ${isDragging ? 'is-dragging' : ''}`}
+      style={isReworked ? { borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.03)' } : undefined}
       draggable
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onClick={() => onSelect(task)}
     >
       <div className="task-card-header">
-        <Badge priority={task.priority} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+          <Badge priority={task.priority} />
+          {isReworked && (
+            <span
+              style={{
+                fontSize: '0.625rem',
+                fontWeight: 800,
+                backgroundColor: '#fef3c7',
+                color: '#d97706',
+                border: '1px solid #fde68a',
+                borderRadius: '4px',
+                padding: '0.05rem 0.35rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.2rem',
+              }}
+              title="Công việc này vừa được Admin yêu cầu làm lại"
+            >
+              ⚠️ Cần làm lại
+            </span>
+          )}
+        </div>
         {task.labels && task.labels.length > 0 && (
           <div className="task-labels-wrap">
             {task.labels.map((lbl) => (

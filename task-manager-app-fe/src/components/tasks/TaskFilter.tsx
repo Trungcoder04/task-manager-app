@@ -24,6 +24,11 @@ export const TaskFilter: React.FC<TaskFilterProps> = ({
     onChange({ ...filters, search: e.target.value });
   };
 
+  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value === 'ALL' ? 'ALL' : Number(e.target.value);
+    onChange({ ...filters, status: val as TaskFilterOptions['status'] });
+  };
+
   const handlePriorityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value === 'ALL' ? 'ALL' : Number(e.target.value);
     onChange({ ...filters, priority: val as TaskFilterOptions['priority'] });
@@ -41,6 +46,7 @@ export const TaskFilter: React.FC<TaskFilterProps> = ({
 
   const hasActiveFilters =
     filters.search ||
+    (filters.status !== undefined && filters.status !== 'ALL') ||
     filters.priority !== 'ALL' ||
     filters.assigneeId !== 'ALL' ||
     filters.labelId !== 'ALL';
@@ -69,6 +75,22 @@ export const TaskFilter: React.FC<TaskFilterProps> = ({
             onChange={handleSearchChange}
           />
         </div>
+
+        {/* Status Filter */}
+        <select
+          className="form-select"
+          style={{ width: 'auto' }}
+          value={filters.status ?? 'ALL'}
+          onChange={handleStatusChange}
+        >
+          <option value="ALL">Tất cả trạng thái</option>
+          <option value={0}>⏳ Chờ duyệt (PENDING)</option>
+          <option value={1}>📋 Cần làm (TODO)</option>
+          <option value={2}>⚡ Đang làm (IN_PROGRESS)</option>
+          <option value={3}>👀 Chờ nghiệm thu (IN_REVIEW)</option>
+          <option value={4}>✅ Hoàn thành (DONE)</option>
+          <option value={5}>❌ Bị từ chối (REJECTED)</option>
+        </select>
 
         {/* Priority Filter */}
         <select

@@ -5,9 +5,12 @@ import { TaskAttachment } from './attachment.types';
 import { TaskActivity } from './activity.types';
 
 export const TaskStatus = {
+  PENDING: 0,
   TODO: 1,
-  DOING: 2,
-  DONE: 3,
+  IN_PROGRESS: 2,
+  IN_REVIEW: 3,
+  DONE: 4,
+  REJECTED: 5,
 } as const;
 
 export type TaskStatusType = (typeof TaskStatus)[keyof typeof TaskStatus];
@@ -19,6 +22,15 @@ export const TaskPriority = {
 } as const;
 
 export type TaskPriorityType = (typeof TaskPriority)[keyof typeof TaskPriority];
+
+export const TaskStatusLabel: Record<TaskStatusType, { label: string; color: string; badge: string }> = {
+  [TaskStatus.PENDING]: { label: 'Chờ duyệt', color: '#f59e0b', badge: 'warning' },
+  [TaskStatus.TODO]: { label: 'Cần làm', color: '#6366f1', badge: 'info' },
+  [TaskStatus.IN_PROGRESS]: { label: 'Đang làm', color: '#3b82f6', badge: 'primary' },
+  [TaskStatus.IN_REVIEW]: { label: 'Chờ nghiệm thu', color: '#8b5cf6', badge: 'purple' },
+  [TaskStatus.DONE]: { label: 'Hoàn thành', color: '#10b981', badge: 'success' },
+  [TaskStatus.REJECTED]: { label: 'Bị từ chối', color: '#ef4444', badge: 'danger' },
+};
 
 export interface Task {
   id: number;

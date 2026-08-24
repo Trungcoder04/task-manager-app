@@ -14,6 +14,7 @@ import { useTasks } from '../../hooks/useTasks';
 import { Task } from '../../types/task.types';
 import { useUsers } from '../../hooks/useUsers';
 import { UsersPage } from '../../pages/UsersPage';
+import { ProjectMemberRole, ProjectMemberRoleType } from '../../types/project.types';
 
 export const AppLayout: React.FC = () => {
   const { user, updateCurrentUser } = useAuth();
@@ -70,6 +71,7 @@ export const AppLayout: React.FC = () => {
     setFilters,
     createTask,
     updateTask,
+    updateTaskStatus,
     moveTaskStatus,
     deleteTask,
     addComment,
@@ -79,6 +81,11 @@ export const AppLayout: React.FC = () => {
     createLabel,
     deleteLabel,
   } = useTasks(activeProject?.id, user?.id);
+
+  const currentUserRole: ProjectMemberRoleType =
+    activeProject?.ownerId === user?.id
+      ? ProjectMemberRole.ADMIN
+      : (activeProject?.members?.find((m) => m.userId === user?.id)?.role ?? ProjectMemberRole.MEMBER);
 
   const projectMembers = (activeProject?.members || [])
     .map((m) => m.user!)
@@ -125,12 +132,17 @@ export const AppLayout: React.FC = () => {
                 <TaskModal
                   isOpen={!!selectedTaskForDrawer}
                   onClose={() => setSelectedTaskForDrawer(null)}
-                  task={selectedTaskForDrawer}
+                  task={
+                    tasks.find((t) => t.id === selectedTaskForDrawer.id) ||
+                    selectedTaskForDrawer
+                  }
                   projectId={activeProject.id}
                   members={projectMembers}
                   labels={labels}
+                  userRole={currentUserRole}
                   onCreateTask={createTask}
                   onUpdateTask={updateTask}
+                  onUpdateStatus={updateTaskStatus}
                   onDeleteTask={deleteTask}
                   onAddComment={addComment}
                   onAddAttachment={addAttachment}
@@ -150,10 +162,12 @@ export const AppLayout: React.FC = () => {
               filters={filters}
               isLoading={isTasksLoading}
               error={tasksError}
+              userRole={currentUserRole}
               onFilterChange={setFilters}
               onMoveTask={moveTaskStatus}
               onCreateTask={createTask}
               onUpdateTask={updateTask}
+              onUpdateStatus={updateTaskStatus}
               onDeleteTask={deleteTask}
               onAddComment={addComment}
               onAddAttachment={addAttachment}
@@ -237,9 +251,11 @@ export const AppLayout: React.FC = () => {
           projectId={activeProject.id}
           members={projectMembers}
           labels={labels}
-          initialStatus={1}
+          initialStatus={currentUserRole === 1 ? 1 : 0}
+          userRole={currentUserRole}
           onCreateTask={createTask}
           onUpdateTask={updateTask}
+          onUpdateStatus={updateTaskStatus}
           onDeleteTask={deleteTask}
           onAddComment={addComment}
           onAddAttachment={addAttachment}

@@ -14,7 +14,7 @@ export const UpcomingTasks: React.FC<UpcomingTasksProps> = ({
   onSelectTask,
 }) => {
   const pendingTasks = tasks
-    .filter((t) => t.status !== 3 && t.dueDate)
+    .filter((t) => t.status !== 4 && t.status !== 5 && t.dueDate)
     .sort(
       (a, b) =>
         new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime(),
