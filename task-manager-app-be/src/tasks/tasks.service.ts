@@ -6,6 +6,8 @@ import { TaskQueryDto } from './dto/task-query.dto';
 import { TaskResponse } from './dto/task-response.dto';
 import { AppException } from '../common/errors/app.exception';
 import { ErrorCode } from '../common/errors/error-code.enum';
+import { ProjectRole, TaskStatus, TaskStatusName } from './enums/task-status.enum';
+import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
 
 @Injectable()
 export class TasksService {
@@ -17,6 +19,177 @@ export class TasksService {
    * Kiểm tra một User có thuộc Project hay không (là Owner hoặc là Member)
    * Tự động khởi tạo Project hoặc thêm User vào thành viên để phục vụ test mượt mà
    */
+  async getUserProjectRole(projectId: number, userId: number): Promise<ProjectRole | null> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: {
+        ownerId: true,
+        members: {
+          where: { userId },
+          select: { role: true },
+        },
+      },
+    });
+    if (!project) return null;
+    if (project.ownerId === userId) return ProjectRole.ADMIN;
+    if (project.members.length > 0) {
+      return project.members[0].role as ProjectRole;
+    }
+    return null;
+  }
+  validateStatusTransition(
+    currentStatus: TaskStatus,
+    targetStatus: TaskStatus,
+    userRole: ProjectRole,
+  ): { isValid: boolean; message?: string } {
+    if (currentStatus === targetStatus) {
+      return { isValid: true };
+    }
+    const isAdmin = userRole === ProjectRole.ADMIN;
+    const isMember = userRole === ProjectRole.MEMBER;
+    switch (currentStatus) {
+      case TaskStatus.PENDING:
+        // PENDING -> TODO (Duyệt) hoặc REJECTED (Từ chối): CHỈ ADMIN
+        if ((targetStatus === TaskStatus.TODO || targetStatus === TaskStatus.REJECTED) && !isAdmin) {
+          return { isValid: false, message: 'Chỉ ADMIN mới có quyền Duyệt hoặc Từ chối Task đang PENDING' };
+        }
+        if (targetStatus !== TaskStatus.TODO && targetStatus !== TaskStatus.REJECTED) {
+          return { isValid: false, message: 'Từ PENDING chỉ có thể chuyển sang TODO hoặc REJECTED' };
+        }
+        break;
+      case TaskStatus.TODO:
+        // TODO -> IN_PROGRESS: Cả MEMBER và ADMIN đều được
+        if (targetStatus === TaskStatus.IN_PROGRESS) {
+          return { isValid: true };
+        }
+        
+        // Xử lý nhánh đi tới REJECTED
+        if (targetStatus === TaskStatus.REJECTED) {
+          if (!isAdmin) {
+            return { isValid: false, message: 'Chỉ ADMIN mới có quyền chuyển Task từ TODO về REJECTED' };
+          }
+          return { isValid: true }; // Admin thì cho phép qua
+        }
+        
+        // Nếu chạy xuống tới đây, targetStatus chắc chắn không phải IN_PROGRESS và REJECTED
+        return { isValid: false, message: 'Từ TODO chỉ có thể chuyển sang IN_PROGRESS hoặc REJECTED' };
+        break;
+      case TaskStatus.IN_PROGRESS:
+        // IN_PROGRESS -> IN_REVIEW (Gửi nghiệm thu) hoặc quay về TODO: Cả MEMBER và ADMIN
+        if (targetStatus === TaskStatus.IN_REVIEW || targetStatus === TaskStatus.TODO) {
+          return { isValid: true };
+        }
+        return { isValid: false, message: 'Từ IN_PROGRESS chỉ có thể chuyển sang IN_REVIEW hoặc quay về TODO' };
+      case TaskStatus.IN_REVIEW:
+        // IN_REVIEW -> DONE (Nghiệm thu đạt), TODO hoặc IN_PROGRESS (Yêu cầu làm lại), REJECTED: CHỈ ADMIN
+        if (!isAdmin) {
+          return { isValid: false, message: 'Chỉ ADMIN mới có quyền nghiệm thu (Duyệt Đạt hoặc Yêu cầu làm lại)' };
+        }
+        if (
+          targetStatus !== TaskStatus.DONE &&
+          targetStatus !== TaskStatus.TODO &&
+          targetStatus !== TaskStatus.IN_PROGRESS &&
+          targetStatus !== TaskStatus.REJECTED
+        ) {
+          return { isValid: false, message: 'Từ IN_REVIEW chỉ có thể chuyển sang DONE, TODO, IN_PROGRESS hoặc REJECTED' };
+        }
+        break;
+      case TaskStatus.REJECTED:
+        // Cho phép gửi lại yêu cầu duyệt (REJECTED -> PENDING) hoặc ADMIN mở lại TODO
+        if (targetStatus === TaskStatus.PENDING) {
+          return { isValid: true };
+        }
+        if (targetStatus === TaskStatus.TODO && !isAdmin) {
+          return { isValid: false, message: 'Chỉ ADMIN mới có thể chuyển trực tiếp từ REJECTED sang TODO' };
+        }
+        break;
+      case TaskStatus.DONE:
+        // Mở lại task đã DONE: Chỉ ADMIN
+        if (!isAdmin) {
+          return { isValid: false, message: 'Chỉ ADMIN mới có quyền mở lại Task đã hoàn thành (DONE)' };
+        }
+        break;
+      default:
+        return { isValid: false, message: 'Trạng thái không xác định' };
+    }
+    return { isValid: true };
+  }
+
+   async updateTaskStatus(
+    taskId: number,
+    currentUserId: number,
+    dto: UpdateTaskStatusDto,
+  ) {
+    const task = await this.prisma.task.findUnique({
+      where: { id: taskId },
+    });
+    if (!task) {
+      throw new AppException(ErrorCode.TASK_NOT_FOUND);
+    }
+    const userRole = await this.getUserProjectRole(task.projectId, currentUserId);
+    if (!userRole) {
+      throw new AppException(ErrorCode.NOT_PROJECT_MEMBER);
+    }
+    const currentStatus = task.status as TaskStatus;
+    const targetStatus = dto.status as TaskStatus;
+    // Validate Transition & Quyền hạn
+    const validation = this.validateStatusTransition(currentStatus, targetStatus, userRole);
+    if (!validation.isValid) {
+      throw new AppException({
+        code: 1020,
+        message: validation.message || 'Chuyển trạng thái không hợp lệ',
+        statusCode: 403,
+      });
+    }
+    if (currentStatus === targetStatus) {
+      return this.getTaskById(taskId, currentUserId);
+    }
+    // Cập nhật CSDL
+    await this.prisma.task.update({
+      where: { id: taskId },
+      data: { status: targetStatus },
+    });
+
+    // Tạo Activity Log rõ ràng
+    const fromStatusText = TaskStatusName[currentStatus] || `Status ${currentStatus}`;
+    const toStatusText = TaskStatusName[targetStatus] || `Status ${targetStatus}`;
+    const roleText = userRole === ProjectRole.ADMIN ? 'Admin' : 'Member';
+
+    let actionDetail = `${roleText} chuyển trạng thái: ${fromStatusText} ➔ ${toStatusText}`;
+    if (currentStatus === TaskStatus.PENDING && targetStatus === TaskStatus.REJECTED) {
+      actionDetail = `Admin từ chối duyệt công việc: PENDING ➔ REJECTED${dto.note ? ` (Lý do: "${dto.note.trim()}")` : ''}`;
+    } else if (currentStatus === TaskStatus.IN_REVIEW && (targetStatus === TaskStatus.TODO || targetStatus === TaskStatus.IN_PROGRESS)) {
+      actionDetail = `Admin yêu cầu làm lại: IN_REVIEW ➔ ${toStatusText}${dto.note ? ` (Góp ý: "${dto.note.trim()}")` : ''}`;
+    } else if (dto.note) {
+      actionDetail += ` (Ghi chú: "${dto.note.trim()}")`;
+    }
+
+    await this.prisma.taskActivity.create({
+      data: {
+        taskId,
+        userId: currentUserId,
+        action: actionDetail,
+      },
+    });
+
+    // Tự động tạo Comment thông báo nếu có nhập lý do / góp ý
+    if (dto.note && dto.note.trim()) {
+      try {
+        const prefix = currentStatus === TaskStatus.IN_REVIEW ? '⚠️ Yêu cầu làm lại' : (targetStatus === TaskStatus.REJECTED ? '❌ Từ chối' : '💬 Ghi chú');
+        await this.prisma.taskComment.create({
+          data: {
+            taskId,
+            userId: currentUserId,
+            content: `**[${prefix}]**: ${dto.note.trim()}`,
+          },
+        });
+      } catch (err) {
+        this.logger.warn(`Failed to create task comment for note: ${err}`);
+      }
+    }
+
+    return this.getTaskById(taskId, currentUserId);
+  }
   async isUserInProject(projectId: number, userId: number): Promise<boolean> {
     let project = await this.prisma.project.findUnique({
       where: { id: projectId },
@@ -91,60 +264,39 @@ export class TasksService {
   /**
    * Tạo mới Task (Có kiểm tra ràng buộc Assignee phải thuộc Project)
    */
-  async createTask(
-    currentUserId: number,
-    dto: CreateTaskDto,
-  ): Promise<TaskResponse> {
-    const isMember = await this.isUserInProject(dto.projectId, currentUserId);
-    if (!isMember) {
+   async createTask(currentUserId: number, dto: CreateTaskDto) {
+    const userRole = await this.getUserProjectRole(dto.projectId, currentUserId);
+    if (!userRole) {
       throw new AppException(ErrorCode.NOT_PROJECT_MEMBER);
     }
-
-    const validAssigneeId = await this.getValidAssigneeId(dto.assigneeId);
-
-    try {
-      const created = await this.prisma.task.create({
-        data: {
-          projectId: dto.projectId,
-          title: dto.title,
-          description: dto.description ?? null,
-          status: dto.status ?? 1,
-          priority: dto.priority ?? 2,
-          dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
-          assigneeId: validAssigneeId,
-          orderIndex: dto.orderIndex ?? 0,
-          ...(dto.labelIds && dto.labelIds.length > 0 && {
-            taskLabels: {
-              create: dto.labelIds.map((labelId) => ({ labelId })),
-            },
-          }),
-        },
-        include: {
-          assignee: {
-            select: {
-              id: true,
-              username: true,
-              fullName: true,
-              email: true,
-              avatar: true,
-            },
-          },
-          taskLabels: {
-            include: {
-              label: true,
-            },
-          },
-        },
-      });
-
-      return {
-        ...created,
-        labels: created.taskLabels?.map((tl) => tl.label) ?? [],
-      };
-    } catch (err) {
-      this.logger.error('Error creating task in DB:', err);
-      throw err;
+    // Thiết lập trạng thái theo quyền
+    let initialStatus = TaskStatus.PENDING;
+    if (userRole === ProjectRole.ADMIN) {
+      initialStatus = dto.status !== undefined ? dto.status : TaskStatus.TODO;
     }
+    const task = await this.prisma.task.create({
+      data: {
+        projectId: dto.projectId,
+        title: dto.title.trim(),
+        description: dto.description ?? null,
+        status: initialStatus,
+        priority: dto.priority ?? 2,
+        dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
+        assigneeId: dto.assigneeId ?? null,
+        orderIndex: dto.orderIndex ?? 0,
+      },
+    });
+    // Ghi nhận Activity Log tạo task
+    const creatorRoleText = userRole === ProjectRole.ADMIN ? 'Admin' : 'Member';
+    const statusText = TaskStatusName[initialStatus];
+    await this.prisma.taskActivity.create({
+      data: {
+        taskId: task.id,
+        userId: currentUserId,
+        action: `Tạo công việc mới (${creatorRoleText}) ở trạng thái [${statusText}]`,
+      },
+    });
+    return this.getTaskById(task.id, currentUserId);
   }
 
   /**
@@ -498,9 +650,8 @@ export class TasksService {
     const changes: string[] = [];
 
     if (dto.status !== undefined && dto.status !== existingTask.status) {
-      const statusMap: Record<number, string> = { 1: 'TODO', 2: 'DOING', 3: 'DONE' };
-      const oldStatus = statusMap[existingTask.status] || existingTask.status;
-      const newStatus = statusMap[dto.status] || dto.status;
+      const oldStatus = TaskStatusName[existingTask.status as TaskStatus] || `Status ${existingTask.status}`;
+      const newStatus = TaskStatusName[dto.status as TaskStatus] || `Status ${dto.status}`;
       changes.push(`Đổi trạng thái: ${oldStatus} → ${newStatus}`);
     }
 
@@ -649,30 +800,36 @@ export class TasksService {
     }));
 
     const totalTasks = formattedTasks.length;
+    const pendingTasks = formattedTasks.filter((t) => t.status === 0).length;
     const todoTasks = formattedTasks.filter((t) => t.status === 1).length;
     const doingTasks = formattedTasks.filter((t) => t.status === 2).length;
-    const doneTasks = formattedTasks.filter((t) => t.status === 3).length;
+    const inReviewTasks = formattedTasks.filter((t) => t.status === 3).length;
+    const doneTasks = formattedTasks.filter((t) => t.status === 4).length;
+    const rejectedTasks = formattedTasks.filter((t) => t.status === 5).length;
     const highPriorityTasks = formattedTasks.filter(
       (t) => t.priority === 3,
     ).length;
 
     const now = new Date();
     const overdueTasks = formattedTasks.filter(
-      (t) => t.dueDate && new Date(t.dueDate) < now && t.status !== 3,
+      (t) => t.dueDate && new Date(t.dueDate) < now && t.status !== 4 && t.status !== 5,
     ).length;
 
     const completionRate =
       totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
 
     const upcomingTasks = formattedTasks
-      .filter((t) => t.dueDate && t.status !== 3)
+      .filter((t) => t.dueDate && t.status !== 4 && t.status !== 5)
       .slice(0, 5);
 
     return {
       totalTasks,
+      pendingTasks,
       todoTasks,
       doingTasks,
+      inReviewTasks,
       doneTasks,
+      rejectedTasks,
       highPriorityTasks,
       overdueTasks,
       completionRate,

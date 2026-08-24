@@ -4,6 +4,7 @@ import {
   UpdateTaskRequest,
   TaskStatus,
   TaskPriority,
+  TaskStatusType,
 } from '../types/task.types';
 import { Label, CreateLabelRequest } from '../types/label.types';
 import { TaskComment } from '../types/comment.types';
@@ -135,6 +136,31 @@ class TaskService {
     return newTask;
   }
 
+  async updateTaskStatus(
+    id: number,
+    status: TaskStatusType,
+    note?: string,
+    updaterId?: number,
+  ): Promise<Task> {
+    try {
+      const response = await apiClient.patch<unknown, ApiResponse<Task>>(
+        `/tasks/${id}/status`,
+        { status, note },
+      );
+      if (response && response.result) {
+        return response.result;
+      }
+      if (response && (response as unknown as Task).id) {
+        return response as unknown as Task;
+      }
+    } catch (err) {
+      if (err instanceof Error) {
+        throw err;
+      }
+    }
+    return this.updateTask(id, { status }, updaterId);
+  }
+
   async updateTask(
     id: number,
     data: UpdateTaskRequest,
@@ -169,15 +195,18 @@ class TaskService {
 
     if (data.status !== undefined && data.status !== current.status) {
       const statusMap: Record<number, string> = {
+        0: 'Pending',
         1: 'Todo',
-        2: 'Doing',
-        3: 'Done',
+        2: 'In Progress',
+        3: 'In Review',
+        4: 'Done',
+        5: 'Rejected',
       };
       newActivities.push({
         id: Date.now(),
         taskId: id,
         userId: updater.id,
-        action: `${updater.fullName} đổi Status: ${statusMap[current.status]} → ${statusMap[data.status]}`,
+        action: `${updater.fullName} đổi Status: ${statusMap[current.status] || current.status} → ${statusMap[data.status] || data.status}`,
         createdAt: new Date().toISOString(),
         user: updater,
       });

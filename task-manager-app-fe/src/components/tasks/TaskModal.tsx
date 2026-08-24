@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Task, TaskPriorityType, TaskStatusType, CreateTaskRequest, UpdateTaskRequest } from '../../types/task.types';
+import { Task, TaskPriorityType, TaskStatusType, CreateTaskRequest, UpdateTaskRequest, TaskStatus } from '../../types/task.types';
 import { User } from '../../types/user.types';
 import { Label } from '../../types/label.types';
+import { ProjectMemberRoleType } from '../../types/project.types';
 import { Button } from '../common/Button';
 import { Icon } from '../common/Icon';
 import { ConfirmModal } from '../common/ConfirmModal';
 import { TaskComments } from './TaskComments';
 import { TaskAttachments } from './TaskAttachments';
 import { TaskActivities } from './TaskActivities';
+import { TaskStatusActions } from './TaskStatusAction';
 
 interface TaskModalProps {
   isOpen: boolean;
@@ -17,8 +19,10 @@ interface TaskModalProps {
   members: User[];
   labels: Label[];
   initialStatus?: TaskStatusType;
+  userRole?: ProjectMemberRoleType;
   onCreateTask: (data: CreateTaskRequest) => Promise<unknown>;
   onUpdateTask: (id: number, data: UpdateTaskRequest) => Promise<unknown>;
+  onUpdateStatus?: (taskId: number, newStatus: TaskStatusType, note?: string) => Promise<unknown>;
   onDeleteTask: (id: number) => Promise<void>;
   onAddComment: (taskId: number, content: string) => Promise<unknown>;
   onAddAttachment: (taskId: number, fileName: string, fileUrl: string) => Promise<unknown>;
@@ -34,8 +38,10 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   members,
   labels,
   initialStatus = 1,
+  userRole,
   onCreateTask,
   onUpdateTask,
+  onUpdateStatus,
   onDeleteTask,
   onAddComment,
   onAddAttachment,
@@ -279,6 +285,81 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               />
             </div>
 
+            {/* Notification Banner for Rework or Rejected tasks */}
+            {isEditing && task?.status === TaskStatus.TODO && task?.activities?.some((a) => a.action.toLowerCase().includes('làm lại')) && (
+              <div
+                style={{
+                  marginBottom: '1rem',
+                  padding: '0.65rem 0.875rem',
+                  backgroundColor: 'rgba(245, 158, 11, 0.12)',
+                  border: '1px solid rgba(245, 158, 11, 0.35)',
+                  borderRadius: 'var(--radius-md)',
+                  color: '#b45309',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  fontSize: '0.8125rem',
+                  fontWeight: 600,
+                }}
+              >
+                <span style={{ fontSize: '1.1rem' }}>⚠️</span>
+                <span>
+                  Công việc này được Admin yêu cầu làm lại. Hãy xem góp ý chi tiết tại tab <strong>Bình luận</strong> hoặc <strong>Lịch sử hoạt động</strong>.
+                </span>
+              </div>
+            )}
+
+            {isEditing && task?.status === TaskStatus.REJECTED && (
+              <div
+                style={{
+                  marginBottom: '1rem',
+                  padding: '0.65rem 0.875rem',
+                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.35)',
+                  borderRadius: 'var(--radius-md)',
+                  color: '#b91c1c',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  fontSize: '0.8125rem',
+                  fontWeight: 600,
+                }}
+              >
+                <span style={{ fontSize: '1.1rem' }}>❌</span>
+                <span>
+                  Công việc này đã bị từ chối duyệt. Bạn có thể chỉnh sửa nội dung và bấm <strong>"Gửi lại yêu cầu duyệt"</strong>.
+                </span>
+              </div>
+            )}
+
+            {/* Quick Status Action Banner based on Role */}
+            {isEditing && task && onUpdateStatus && userRole !== undefined && (
+              <div
+                style={{
+                  marginBottom: '1rem',
+                  padding: '0.75rem 1rem',
+                  background: 'var(--bg-surface-secondary)',
+                  borderRadius: 'var(--radius-lg)',
+                  border: '1px solid var(--border-color)',
+                }}
+              >
+                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                  ⚡ Thao tác duyệt & chuyển trạng thái ({userRole === 1 ? 'Quản trị viên / Admin' : 'Thành viên / Member'}):
+                </div>
+                <TaskStatusActions
+                  task={{ ...task, status }}
+                  userRole={userRole}
+                  onUpdateStatus={async (newStatus, note) => {
+                    if (task && onUpdateStatus) {
+                      await onUpdateStatus(task.id, newStatus, note);
+                    }
+                    setStatus(newStatus);
+                  }}
+                  isLoading={isLoading}
+                />
+              </div>
+            )}
+
             {/* 4 Metadata Fields in Compact Grid */}
             <div
               style={{
@@ -299,9 +380,12 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                   disabled={isLoading}
                   style={{ fontSize: '0.8125rem', padding: '0.45rem 0.65rem' }}
                 >
-                  <option value={1}>TODO</option>
-                  <option value={2}>DOING</option>
-                  <option value={3}>DONE</option>
+                  <option value={0}>PENDING </option>
+                  <option value={1}>TODO </option>
+                  <option value={2}>IN_PROGRESS </option>
+                  <option value={3}>IN_REVIEW </option>
+                  <option value={4}>DONE </option>
+                  <option value={5}>REJECTED </option>
                 </select>
               </div>
 
@@ -317,9 +401,9 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                   disabled={isLoading}
                   style={{ fontSize: '0.8125rem', padding: '0.45rem 0.65rem' }}
                 >
-                  <option value={3}>🔴 Cao (High)</option>
-                  <option value={2}>🟡 Trung bình (Medium)</option>
-                  <option value={1}>🟢 Thấp (Low)</option>
+                  <option value={3}>Cao </option>
+                  <option value={2}>Trung bình </option>
+                  <option value={1}>Thấp </option>
                 </select>
               </div>
 

@@ -129,6 +129,30 @@ export const useTasks = (projectId?: number, currentUserId?: number) => {
     }
   };
 
+  const updateTaskStatus = async (
+    taskId: number,
+    newStatus: TaskStatusType,
+    note?: string,
+  ) => {
+    try {
+      const updated = await taskService.updateTaskStatus(
+        taskId,
+        newStatus,
+        note,
+        currentUserId || 1,
+      );
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? { ...t, ...updated, status: newStatus } : t)),
+      );
+      showToast('Cập nhật trạng thái thành công!', 'success');
+      return updated;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Cập nhật trạng thái thất bại';
+      showToast(msg, 'error');
+      throw err;
+    }
+  };
+
   const moveTaskStatus = async (taskId: number, newStatus: TaskStatusType) => {
     const currentTask = tasks.find((t) => t.id === taskId);
     // Nếu trạng thái không thay đổi -> không cần gọi API
@@ -143,7 +167,7 @@ export const useTasks = (projectId?: number, currentUserId?: number) => {
     );
 
     try {
-      await taskService.updateTask(taskId, { status: newStatus }, currentUserId || 1);
+      await taskService.updateTaskStatus(taskId, newStatus, undefined, currentUserId || 1);
       showToast(`Đã chuyển trạng thái công việc!`, 'info');
     } catch (err) {
       setTasks(prevTasks); // Rollback
@@ -278,6 +302,7 @@ export const useTasks = (projectId?: number, currentUserId?: number) => {
     refreshTasks: fetchData,
     createTask,
     updateTask,
+    updateTaskStatus,
     moveTaskStatus,
     deleteTask,
     addComment,

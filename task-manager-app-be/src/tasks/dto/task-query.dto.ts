@@ -5,8 +5,8 @@ export class TaskQueryDto {
   @IsOptional()
   @IsInt()
   @Type(() => Number)
-  @Min(1)
-  @Max(3)
+  @Min(0)
+  @Max(5)
   status?: number;
 
   @IsOptional()
