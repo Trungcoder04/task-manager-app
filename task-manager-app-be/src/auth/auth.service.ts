@@ -75,6 +75,13 @@ export class AuthService {
       throw new AppException(ErrorCode.USER_NOT_EXISTED);
     }
 
+    if (user.status === 2) {
+      throw new AppException(ErrorCode.ACCOUNT_LOCKED);
+    }
+    if (user.status === 3) {
+      throw new AppException(ErrorCode.ACCOUNT_DISABLED);
+    }
+
     const authenticated = await bcrypt.compare(request.password, user.password);
     if (!authenticated) {
       throw new AppException(ErrorCode.UNAUTHENTICATED);

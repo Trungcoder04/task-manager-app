@@ -18,4 +18,10 @@ export class UserUpdateRequest {
   @IsEmail({}, { message: 'INVALID_EMAIL' })
   @IsOptional()
   email?: string;
+
+  @IsOptional()
+  status?: number;
+
+  @IsOptional()
+  role?: number;
 }

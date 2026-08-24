@@ -2,6 +2,24 @@ import { ApiResponse } from '../types/api.types';
 import { User, UserUpdateRequest } from '../types/user.types';
 import apiClient from './apiClient';
 
+
+export interface CreateUserPayload {
+  username: string;
+  password?: string;
+  fullName: string;
+  email?: string;
+  status?: number;
+  role?: number;
+}
+
+export interface UpdateUserPayload {
+  fullName?: string;
+  email?: string;
+  password?: string;
+  status?: number;
+  role?: number;
+}
+
 class UserService {
   async getUsers(): Promise<User[]> {
     try {
@@ -23,12 +41,26 @@ class UserService {
     throw new Error(res?.message || 'User not found');
   }
 
+  // Them moi nguoi dung
+  async createUser(data: CreateUserPayload): Promise<User> {
+    const res = await apiClient.post<unknown, ApiResponse<User>>('/users', data);
+    if(res && res.result) {
+      return res.result;
+    }
+    throw new Error(res?.message || 'Tạo người dùng thất bại');
+  }
+
   async updateUser(id: number, data: UserUpdateRequest): Promise<User> {
     const res = await apiClient.put<unknown, ApiResponse<User>>(`/users/${id}`, data);
     if (res && res.result) {
       return res.result;
     }
     throw new Error(res?.message || 'Cập nhật thất bại');
+  }
+
+  // Xoa nguoi dung
+  async deleteUser(id: number): Promise<void> {
+    await apiClient.delete(`/users/${id}`);
   }
 
   async uploadAvatar(userId: number, file: File): Promise<{ avatar: string }> {

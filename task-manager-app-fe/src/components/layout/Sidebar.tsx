@@ -3,7 +3,7 @@ import { Icon, IconName } from '../common/Icon';
 import { Avatar } from '../common/Avatar';
 import { useAuth } from '../../hooks/useAuth';
 
-export type TabType = 'dashboard' | 'board' | 'projects' | 'profile';
+export type TabType = 'dashboard' | 'board' | 'projects' | 'profile' | 'users';
 
 interface SidebarProps {
   activeTab: TabType;
@@ -22,6 +22,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'dashboard', label: 'Tổng quan (Dashboard)', icon: 'layout-dashboard' },
     { id: 'board', label: 'Bảng Kanban (Board)', icon: 'kanban' },
     { id: 'projects', label: 'Dự án (Projects)', icon: 'folder' },
+    { id: 'users', label: "Người dùng (Users)", icon: 'users'}
   ];
 
   return (
