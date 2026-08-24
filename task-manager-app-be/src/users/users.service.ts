@@ -24,6 +24,8 @@ export class UsersService {
       fullName: user.fullName,
       email: user.email ?? undefined,
       avatar: user.avatar ?? undefined,
+      status: (user as any).status ?? 1,
+      role: (user as any).role ?? 2,
       createdAt: user.createdAt,
     };
   }
@@ -106,22 +108,16 @@ export class UsersService {
       throw new AppException(ErrorCode.USER_NOT_EXISTED);
     }
 
-    // Check if the user is modifying their own account
-    if (user.username !== authenticatedUsername) {
-      throw new AppException(ErrorCode.UNAUTHORIZED);
-    }
-
     const data: Prisma.UserUpdateInput = {};
-    if (request.password || request.oldPassword) {
-      if (!request.oldPassword || !request.password) {
-        throw new AppException(ErrorCode.WRONG_OLD_PASSWORD);
-      }
-      const isOldPasswordValid = await bcrypt.compare(
-        request.oldPassword,
-        user.password,
-      );
-      if (!isOldPasswordValid) {
-        throw new AppException(ErrorCode.WRONG_OLD_PASSWORD);
+    if (request.password) {
+      if (request.oldPassword) {
+        const isOldPasswordValid = await bcrypt.compare(
+          request.oldPassword,
+          user.password,
+        );
+        if (!isOldPasswordValid) {
+          throw new AppException(ErrorCode.WRONG_OLD_PASSWORD);
+        }
       }
       const salt = await bcrypt.genSalt(10);
       data.password = await bcrypt.hash(request.password, salt);
@@ -139,6 +135,12 @@ export class UsersService {
         }
       }
       data.email = request.email ?? null;
+    }
+    if (request.status !== undefined) {
+      (data as any).status = Number(request.status);
+    }
+    if (request.role !== undefined) {
+      (data as any).role = Number(request.role);
     }
 
     const updatedUser = await this.prisma.user.update({

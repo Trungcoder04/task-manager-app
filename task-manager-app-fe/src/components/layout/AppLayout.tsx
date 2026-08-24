@@ -12,6 +12,8 @@ import { useAuth } from '../../hooks/useAuth';
 import { useProjects } from '../../hooks/useProjects';
 import { useTasks } from '../../hooks/useTasks';
 import { Task } from '../../types/task.types';
+import { useUsers } from '../../hooks/useUsers';
+import { UsersPage } from '../../pages/UsersPage';
 import { ProjectMemberRole, ProjectMemberRoleType } from '../../types/project.types';
 
 export const AppLayout: React.FC = () => {
@@ -36,6 +38,27 @@ export const AppLayout: React.FC = () => {
     removeMember,
     updateMemberRole,
   } = useProjects(user?.id);
+
+    // Users state
+  const {
+    users: allUsers,
+    filteredUsers,
+    paginatedUsers,
+    isLoading: isUsersLoading,
+    error: usersError,
+    searchTerm: userSearchTerm,
+    setSearchTerm: setUserSearchTerm,
+    statusFilter: userStatusFilter,
+    setStatusFilter: setUserStatusFilter,
+    page: userPage,
+    setPage: setUserPage,
+    pageSize: userPageSize,
+    setPageSize: setUserPageSize,
+    totalPages: userTotalPages,
+    createUser: createNewUser,
+    updateUser: updateUserInfo,
+    deleteUser: deleteUserAccount,
+  } = useUsers();
 
   // Tasks state
   const {
@@ -172,6 +195,29 @@ export const AppLayout: React.FC = () => {
               onRemoveMember={removeMember}
               onUpdateRole={updateMemberRole}
               onOpenBoard={() => setActiveTab('board')}
+            />
+          )}
+
+          {activeTab === 'users' && (
+            <UsersPage
+              currentUser={user}
+              users={allUsers}
+              filteredUsers={filteredUsers}
+              paginatedUsers={paginatedUsers}
+              isLoading={isUsersLoading}
+              error={usersError}
+              searchTerm={userSearchTerm}
+              onSearchChange={setUserSearchTerm}
+              statusFilter={userStatusFilter}
+              onStatusFilterChange={setUserStatusFilter}
+              page={userPage}
+              onPageChange={setUserPage}
+              pageSize={userPageSize}
+              onPageSizeChange={setUserPageSize}
+              totalPages={userTotalPages}
+              onCreateUser={createNewUser}
+              onUpdateUser={updateUserInfo}
+              onDeleteUser={deleteUserAccount}
             />
           )}
         </main>
