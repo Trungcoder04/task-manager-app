@@ -100,6 +100,16 @@ export const ErrorCode = {
     message: 'Không tìm thấy tệp đính kèm',
     statusCode: 404,
   },
+  ACCOUNT_LOCKED: {
+    code: 1014,
+    message: 'Tài khoản của bạn hiện đang bị khóa. Vui lòng liên hệ Quản trị viên!',
+    statusCode: 403,
+  },
+  ACCOUNT_DISABLED: {
+    code: 1015,
+    message: 'Tài khoản của bạn đã bị vô hiệu hóa.',
+    statusCode: 403,
+  },
 } as const;
 
 

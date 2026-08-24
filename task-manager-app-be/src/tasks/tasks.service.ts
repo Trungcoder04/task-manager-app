@@ -13,10 +13,7 @@ export class TasksService {
 
   constructor(private readonly prisma: PrismaService) { }
 
-  /**
-   * Kiểm tra một User có thuộc Project hay không (là Owner hoặc là Member)
-   * Tự động khởi tạo Project hoặc thêm User vào thành viên để phục vụ test mượt mà
-   */
+
   async isUserInProject(projectId: number, userId: number): Promise<boolean> {
     let project = await this.prisma.project.findUnique({
       where: { id: projectId },
@@ -147,9 +144,7 @@ export class TasksService {
     }
   }
 
-  /**
-   * Lấy danh sách Task theo Project (Có filter & tìm kiếm)
-   */
+ 
   async getProjectTasks(
     projectId: number,
     currentUserId: number,
