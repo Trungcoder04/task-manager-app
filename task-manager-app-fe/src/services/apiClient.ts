@@ -1,6 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://task-manager-app-c46e.onrender.com/api';
 
 export const apiClient: AxiosInstance = axios.create({
   baseURL: BASE_URL,
