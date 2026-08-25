@@ -221,7 +221,7 @@ export const UserModal: React.FC<UserModalProps> = ({
           {/* Email Input */}
           <div className="form-group" style={{ margin: 0 }}>
             <label className="form-label" style={{ fontWeight: 700, fontSize: '0.875rem', marginBottom: '0.5rem' }}>
-              Email liên hệ (Tùy chọn)
+              Email liên hệ
             </label>
             <div style={{ position: 'relative' }}>
               <input
@@ -264,7 +264,7 @@ export const UserModal: React.FC<UserModalProps> = ({
           {/* Role Dropdown */}
           <div className="form-group" style={{ margin: 0 }}>
             <label className="form-label" style={{ fontWeight: 700, fontSize: '0.875rem', marginBottom: '0.5rem' }}>
-              Vai trò (Phân quyền)
+              Vai trò
             </label>
             <select
               className="form-input"
@@ -277,8 +277,8 @@ export const UserModal: React.FC<UserModalProps> = ({
                 cursor: 'pointer',
               }}
             >
-              <option value={1}>👑 Quản trị viên (Admin)</option>
-              <option value={2}>👤 Thành viên (User)</option>
+              <option value={1}>👑 Quản trị viên</option>
+              <option value={2}>👤 Thành viên</option>
             </select>
           </div>
 
