@@ -89,5 +89,6 @@ export interface TaskFilterOptions {
   status?: TaskStatusType | 'ALL';
   priority?: TaskPriorityType | 'ALL';
   assigneeId?: number | 'ALL';
+  assignerId?: number | 'ALL';
   labelId?: number | 'ALL';
 }
