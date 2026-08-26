@@ -43,6 +43,11 @@ export const TaskFilter: React.FC<TaskFilterProps> = ({
     onChange({ ...filters, assigneeId: val as TaskFilterOptions['assigneeId'] });
   };
 
+  const handleAssignerChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value === 'ALL' ? 'ALL' : Number(e.target.value);
+    onChange({ ...filters, assignerId: val as TaskFilterOptions['assignerId'] });
+  };
+
   const handleLabelChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value === 'ALL' ? 'ALL' : Number(e.target.value);
     onChange({ ...filters, labelId: val as TaskFilterOptions['labelId'] });
@@ -53,6 +58,7 @@ export const TaskFilter: React.FC<TaskFilterProps> = ({
     (filters.status !== undefined && filters.status !== 'ALL') ||
     filters.priority !== 'ALL' ||
     filters.assigneeId !== 'ALL' ||
+    (filters.assignerId !== undefined && filters.assignerId !== 'ALL') ||
     filters.labelId !== 'ALL';
 
   const resetFilters = () => {
@@ -61,6 +67,7 @@ export const TaskFilter: React.FC<TaskFilterProps> = ({
       status: 'ALL',
       priority: 'ALL',
       assigneeId: 'ALL',
+      assignerId: 'ALL',
       labelId: 'ALL',
     });
   };
@@ -109,7 +116,22 @@ export const TaskFilter: React.FC<TaskFilterProps> = ({
           <option value={1}>Thấp</option>
         </select>
 
-        {/* Assignee Filter */}
+        {/* Assigner Filter (Người giao việc) */}
+        <select
+          className="form-select"
+          style={{ width: 'auto' }}
+          value={filters.assignerId || 'ALL'}
+          onChange={handleAssignerChange}
+        >
+          <option value="ALL">Người giao việc</option>
+          {members.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.fullName || m.username}
+            </option>
+          ))}
+        </select>
+
+        {/* Assignee Filter (Người thực hiện) */}
         <select
           className="form-select"
           style={{ width: 'auto' }}
@@ -119,7 +141,7 @@ export const TaskFilter: React.FC<TaskFilterProps> = ({
           <option value="ALL">Người thực hiện</option>
           {members.map((m) => (
             <option key={m.id} value={m.id}>
-              {m.fullName}
+              {m.fullName || m.username}
             </option>
           ))}
         </select>

@@ -21,6 +21,7 @@ export const useTasks = (projectId?: number, currentUserId?: number) => {
     status: 'ALL',
     priority: 'ALL',
     assigneeId: 'ALL',
+    assignerId: 'ALL',
     labelId: 'ALL',
   });
   const { showToast } = useToast();
@@ -75,8 +76,13 @@ export const useTasks = (projectId?: number, currentUserId?: number) => {
         return false;
       }
 
-      // Assignee filter
+      // Assignee filter (Người thực hiện)
       if (filters.assigneeId && filters.assigneeId !== 'ALL' && task.assigneeId !== filters.assigneeId) {
+        return false;
+      }
+
+      // Assigner filter (Người giao việc)
+      if (filters.assignerId && filters.assignerId !== 'ALL' && task.assignerId !== filters.assignerId) {
         return false;
       }
 
