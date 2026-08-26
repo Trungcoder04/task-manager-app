@@ -20,6 +20,14 @@ export class TasksService {
    * Tự động khởi tạo Project hoặc thêm User vào thành viên để phục vụ test mượt mà
    */
   async getUserProjectRole(projectId: number, userId: number): Promise<ProjectRole | null> {
+    const systemUser = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    if (systemUser && systemUser.role === 1) {
+      return ProjectRole.ADMIN;
+    }
+
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       select: {
@@ -33,7 +41,11 @@ export class TasksService {
     if (!project) return null;
     if (project.ownerId === userId) return ProjectRole.ADMIN;
     if (project.members.length > 0) {
-      return project.members[0].role as ProjectRole;
+      const mRole = project.members[0].role;
+      if (mRole === 1 || mRole === 2) {
+        return ProjectRole.ADMIN;
+      }
+      return ProjectRole.MEMBER;
     }
     return null;
   }
@@ -269,11 +281,15 @@ export class TasksService {
     if (!userRole) {
       throw new AppException(ErrorCode.NOT_PROJECT_MEMBER);
     }
-    // Thiết lập trạng thái theo quyền
-    let initialStatus = TaskStatus.PENDING;
-    if (userRole === ProjectRole.ADMIN) {
+    const isAdmin = userRole === ProjectRole.ADMIN;
+    if (!dto.title || !dto.title.trim()) {
+      throw new AppException(ErrorCode.INVALID_KEY);
+    }
+    let initialStatus = dto.status !== undefined ? dto.status : TaskStatus.PENDING;
+    if (isAdmin || (dto.assigneeId && dto.assigneeId === currentUserId)) {
       initialStatus = dto.status !== undefined ? dto.status : TaskStatus.TODO;
     }
+
     const task = await this.prisma.task.create({
       data: {
         projectId: dto.projectId,
@@ -283,11 +299,13 @@ export class TasksService {
         priority: dto.priority ?? 2,
         dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
         assigneeId: dto.assigneeId ?? null,
+        assignerId: dto.assignerId ?? (isAdmin ? currentUserId : null),
+        createdById: currentUserId,
         orderIndex: dto.orderIndex ?? 0,
       },
     });
     // Ghi nhận Activity Log tạo task
-    const creatorRoleText = userRole === ProjectRole.ADMIN ? 'Admin' : 'Member';
+    const creatorRoleText = isAdmin ? 'Admin/Lead' : 'Member';
     const statusText = TaskStatusName[initialStatus];
     await this.prisma.taskActivity.create({
       data: {
@@ -300,35 +318,85 @@ export class TasksService {
   }
 
   /**
-   * Lấy danh sách Task theo Project (Có filter & tìm kiếm)
+   * Lấy danh sách Task theo Project (Có filter, tìm kiếm & Phân quyền bảo mật Task PENDING/DRAFT)
    */
   async getProjectTasks(
     projectId: number,
     currentUserId: number,
     query: TaskQueryDto,
   ): Promise<TaskResponse[]> {
-    const isMember = await this.isUserInProject(projectId, currentUserId);
-    if (!isMember) {
+    const userRole = await this.getUserProjectRole(projectId, currentUserId);
+    if (!userRole) {
       throw new AppException(ErrorCode.NOT_PROJECT_MEMBER);
     }
 
-    const whereCondition: Record<string, unknown> = { projectId };
+    const isAdminOrLead = userRole === ProjectRole.ADMIN;
 
-    if (query.status) whereCondition.status = query.status;
-    if (query.priority) whereCondition.priority = query.priority;
-    if (query.assigneeId) whereCondition.assigneeId = query.assigneeId;
-    if (query.search) {
-      whereCondition.OR = [
-        { title: { contains: query.search } },
-        { description: { contains: query.search } },
-      ];
+    // 🔒 CHÍNH SÁCH BẢO MẬT HIỂN THỊ TASK PENDING/DRAFT
+    // Member thường: chỉ thấy task khi:
+    //   a) status >= 1 (đã được duyệt vào TODO+)
+    //   b) hoặc họ là người TẠO task (createdById)
+    //   c) hoặc họ là người GIAO việc (assignerId)
+    // Admin/Lead/Owner: thấy tất cả task
+    const visibilityFilter = !isAdminOrLead
+      ? {
+          OR: [
+            { status: { gte: 1 } },
+            { createdById: currentUserId },
+            { assignerId: currentUserId },
+          ],
+        }
+      : {};
+
+    // Gộp tất cả filter vào AND để tránh xung đột
+    const andConditions: object[] = [
+      { projectId },
+      ...(Object.keys(visibilityFilter).length > 0 ? [visibilityFilter] : []),
+    ];
+
+    if (query.status !== undefined && query.status !== null) {
+      andConditions.push({ status: query.status });
     }
+    if (query.priority !== undefined && query.priority !== null) {
+      andConditions.push({ priority: query.priority });
+    }
+    if (query.assigneeId !== undefined && query.assigneeId !== null) {
+      andConditions.push({ assigneeId: query.assigneeId });
+    }
+    if (query.search) {
+      andConditions.push({
+        OR: [
+          { title: { contains: query.search } },
+          { description: { contains: query.search } },
+        ],
+      });
+    }
+
+    const whereCondition = { AND: andConditions };
 
     const tasks = await this.prisma.task.findMany({
       where: whereCondition,
       orderBy: [{ orderIndex: 'asc' }, { createdAt: 'desc' }],
       include: {
         assignee: {
+          select: {
+            id: true,
+            username: true,
+            fullName: true,
+            email: true,
+            avatar: true,
+          },
+        },
+        assigner: {
+          select: {
+            id: true,
+            username: true,
+            fullName: true,
+            email: true,
+            avatar: true,
+          },
+        },
+        createdBy: {
           select: {
             id: true,
             username: true,
@@ -646,6 +714,11 @@ export class TasksService {
         ? await this.getValidAssigneeId(dto.assigneeId)
         : undefined;
 
+    const validAssignerId =
+      dto.assignerId !== undefined
+        ? await this.getValidAssigneeId(dto.assignerId)
+        : undefined;
+
     // So sánh dữ liệu cũ và mới để xác định những trường thực sự thay đổi
     const changes: string[] = [];
 
@@ -662,8 +735,13 @@ export class TasksService {
       changes.push(`Đổi độ ưu tiên: ${oldPriority} → ${newPriority}`);
     }
 
-    if (dto.title !== undefined && dto.title.trim() !== existingTask.title) {
-      changes.push(`Đổi tiêu đề thành "${dto.title.trim()}"`);
+    if (dto.title !== undefined) {
+      if (!dto.title.trim()) {
+        throw new AppException(ErrorCode.INVALID_KEY);
+      }
+      if (dto.title.trim() !== existingTask.title) {
+        changes.push(`Đổi tiêu đề thành "${dto.title.trim()}"`);
+      }
     }
 
     if (dto.description !== undefined && dto.description !== existingTask.description) {
@@ -687,6 +765,18 @@ export class TasksService {
           select: { fullName: true },
         });
         changes.push(`Chỉ định cho ${newAssignee?.fullName || 'thành viên mới'}`);
+      }
+    }
+
+    if (validAssignerId !== undefined && validAssignerId !== existingTask.assignerId) {
+      if (validAssignerId === null) {
+        changes.push('Bỏ chỉ định người giao việc');
+      } else {
+        const newAssigner = await this.prisma.user.findUnique({
+          where: { id: validAssignerId },
+          select: { fullName: true },
+        });
+        changes.push(`Đổi người giao việc thành ${newAssigner?.fullName || 'thành viên mới'}`);
       }
     }
 
@@ -715,6 +805,7 @@ export class TasksService {
           dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
         }),
         ...(validAssigneeId !== undefined && { assigneeId: validAssigneeId }),
+        ...(validAssignerId !== undefined && { assignerId: validAssignerId }),
         ...(dto.orderIndex !== undefined && { orderIndex: dto.orderIndex }),
       },
     });

@@ -41,9 +41,13 @@ export interface Task {
   priority: TaskPriorityType;
   dueDate?: string;
   assigneeId?: number;
+  assignerId?: number;
+  createdById?: number;
   orderIndex: number;
   createdAt: string;
   assignee?: User;
+  assigner?: User;
+  createdBy?: User;
   labels?: Label[];
   comments?: TaskComment[];
   attachments?: TaskAttachment[];
@@ -63,7 +67,9 @@ export interface CreateTaskRequest {
   priority?: TaskPriorityType;
   dueDate?: string;
   assigneeId?: number;
+  assignerId?: number;
   labelIds?: number[];
+  orderIndex?: number;
 }
 
 export interface UpdateTaskRequest {
@@ -73,6 +79,7 @@ export interface UpdateTaskRequest {
   priority?: TaskPriorityType;
   dueDate?: string;
   assigneeId?: number | null;
+  assignerId?: number | null;
   orderIndex?: number;
   labelIds?: number[];
 }

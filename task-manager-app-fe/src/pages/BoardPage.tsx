@@ -10,11 +10,13 @@ import {
 import { Label, CreateLabelRequest } from '../types/label.types';
 import { TaskFilter } from '../components/tasks/TaskFilter';
 import { TaskBoard } from '../components/tasks/TaskBoard';
+import { TaskList } from '../components/tasks/TaskList';
 import { TaskModal } from '../components/tasks/TaskModal';
 import { LabelManagerModal } from '../components/tasks/LabelManagerModal';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { EmptyState } from '../components/common/EmptyState';
 import { Button } from '../components/common/Button';
+import { Icon } from '../components/common/Icon';
 
 interface BoardPageProps {
   project: Project | null;
@@ -71,6 +73,9 @@ export const BoardPage: React.FC<BoardPageProps> = ({
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [initialColumnStatus, setInitialColumnStatus] = useState<TaskStatusType>(1);
   const [isLabelModalOpen, setIsLabelModalOpen] = useState(false);
+  
+  // State Chuyển Đổi Chế Độ Xem ('board' | 'list')
+  const [viewMode, setViewMode] = useState<'board' | 'list'>('board');
 
   const activeTaskId = externalSelectedTask?.id || internalSelectedTask?.id;
   const activeTask =
@@ -134,22 +139,33 @@ export const BoardPage: React.FC<BoardPageProps> = ({
 
   return (
     <div className="board-page">
-      {/* Search & Filter Toolbar */}
+      {/* Search, Filter & View Switcher Toolbar */}
       <TaskFilter
         filters={filters}
         labels={labels}
         members={projectMembers}
+        viewMode={viewMode}
         onChange={onFilterChange}
         onOpenLabelManager={() => setIsLabelModalOpen(true)}
+        onViewModeChange={setViewMode}
       />
 
-      {/* Main Kanban Board */}
-      <TaskBoard
-        tasks={filteredTasks}
-        onSelectTask={handleSelectTask}
-        onMoveTask={onMoveTask}
-        onQuickAdd={handleQuickAdd}
-      />
+      {/* Conditional Rendering View Mode */}
+      {viewMode === 'board' ? (
+        <TaskBoard
+          tasks={filteredTasks}
+          onSelectTask={handleSelectTask}
+          onMoveTask={onMoveTask}
+          onQuickAdd={handleQuickAdd}
+        />
+      ) : (
+        <TaskList
+          tasks={filteredTasks}
+          onSelectTask={handleSelectTask}
+          onMoveTask={onMoveTask}
+          onDeleteTask={onDeleteTask}
+        />
+      )}
 
       {/* Task Detail / Edit / Create Drawer */}
       <TaskModal
@@ -158,6 +174,7 @@ export const BoardPage: React.FC<BoardPageProps> = ({
         task={activeTask}
         projectId={project.id}
         members={projectMembers}
+        projectMembers={project.members || []}
         labels={labels}
         initialStatus={initialColumnStatus}
         userRole={userRole}

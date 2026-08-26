@@ -25,15 +25,19 @@ export const Badge: React.FC<BadgeProps> = ({
   }
 
   const getPriorityText = () => {
-    if (priority === 3) return 'High';
-    if (priority === 2) return 'Medium';
-    return 'Low';
+    if (priority === 3) return 'Cao';
+    if (priority === 2) return 'Trung bình';
+    return 'Thấp';
   };
 
   const getStatusText = () => {
-    if (status === 1) return 'TODO';
-    if (status === 2) return 'DOING';
-    return 'DONE';
+    if (status === 0) return 'Chờ duyệt';
+    if (status === 1) return 'Cần làm';
+    if (status === 2) return 'Đang làm';
+    if (status === 3) return 'Chờ nghiệm thu';
+    if (status === 4) return 'Hoàn thành';
+    if (status === 5) return 'Bị từ chối';
+    return '';
   };
 
   const displayText = children || (priority !== undefined ? getPriorityText() : status !== undefined ? getStatusText() : '');

@@ -83,9 +83,11 @@ export const AppLayout: React.FC = () => {
   } = useTasks(activeProject?.id, user?.id);
 
   const currentUserRole: ProjectMemberRoleType =
-    activeProject?.ownerId === user?.id
+    user?.role === 1 ||
+    activeProject?.ownerId === user?.id ||
+    activeProject?.members?.find((m) => m.userId === user?.id)?.role === 1
       ? ProjectMemberRole.ADMIN
-      : (activeProject?.members?.find((m) => m.userId === user?.id)?.role ?? ProjectMemberRole.MEMBER);
+      : ProjectMemberRole.MEMBER;
 
   const projectMembers = (activeProject?.members || [])
     .map((m) => m.user!)
@@ -250,6 +252,7 @@ export const AppLayout: React.FC = () => {
           onClose={() => setIsQuickCreateTaskOpen(false)}
           projectId={activeProject.id}
           members={projectMembers}
+          projectMembers={activeProject.members || []}
           labels={labels}
           initialStatus={currentUserRole === 1 ? 1 : 0}
           userRole={currentUserRole}

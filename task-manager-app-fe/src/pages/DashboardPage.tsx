@@ -12,9 +12,12 @@ import { taskService } from '../services/taskService';
 
 interface DashboardStats {
   totalTasks: number;
+  pendingTasks?: number;
   todoTasks: number;
   doingTasks: number;
+  inReviewTasks?: number;
   doneTasks: number;
+  rejectedTasks?: number;
   highPriorityTasks: number;
   overdueTasks: number;
   completionRate: number;
@@ -92,12 +95,16 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   }
 
   const totalTasks = stats?.totalTasks ?? tasks.length;
+  const pendingTasks =
+    stats?.pendingTasks ?? tasks.filter((t) => t.status === 0).length;
   const todoTasks =
     stats?.todoTasks ?? tasks.filter((t) => t.status === 1).length;
   const doingTasks =
     stats?.doingTasks ?? tasks.filter((t) => t.status === 2).length;
+  const inReviewTasks =
+    stats?.inReviewTasks ?? tasks.filter((t) => t.status === 3).length;
   const doneTasks =
-    stats?.doneTasks ?? tasks.filter((t) => t.status === 3).length;
+    stats?.doneTasks ?? tasks.filter((t) => t.status === 4).length;
   const completionRate =
     stats?.completionRate ??
     (totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0);
@@ -140,6 +147,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           bgColor="var(--primary-50)"
         />
         <StatCard
+          title="Chờ duyệt (PENDING)"
+          value={pendingTasks}
+          icon="clock"
+          color="#f59e0b"
+          bgColor="rgba(245, 158, 11, 0.12)"
+        />
+        <StatCard
           title="Cần thực hiện (TODO)"
           value={todoTasks}
           icon="clock"
@@ -147,11 +161,18 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           bgColor="var(--bg-surface-secondary)"
         />
         <StatCard
-          title="Đang làm (DOING)"
+          title="Đang làm (IN PROGRESS)"
           value={doingTasks}
           icon="edit"
           color="var(--status-doing)"
           bgColor="rgba(59, 130, 246, 0.12)"
+        />
+        <StatCard
+          title="Chờ nghiệm thu (REVIEW)"
+          value={inReviewTasks}
+          icon="send"
+          color="#8b5cf6"
+          bgColor="rgba(139, 92, 246, 0.12)"
         />
         <StatCard
           title="Đã hoàn thành (DONE)"

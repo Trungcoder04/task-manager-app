@@ -300,10 +300,10 @@ export const UsersPage: React.FC<UsersPageProps> = ({
         </div>
 
         {/* Status Filter Select */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.845rem', color: 'var(--text-secondary)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.845rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', flexShrink: 0 }}>
             <Icon name="filter" size={15} />
-            <span style={{ fontWeight: 600 }}>Trạng thái:</span>
+            <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>Trạng thái:</span>
           </div>
 
           <select

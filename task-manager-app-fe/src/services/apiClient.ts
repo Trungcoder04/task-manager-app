@@ -1,9 +1,10 @@
 import axios, { AxiosInstance } from 'axios';
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://task-manager-app-c46e.onrender.com/api';
 
 export const apiClient: AxiosInstance = axios.create({
   baseURL: BASE_URL,
+  timeout: 20000, // 20 giây timeout – ngăn Render spin-down im lặng
   headers: {
     'Content-Type': 'application/json',
   },
@@ -34,10 +35,15 @@ apiClient.interceptors.response.use(
     return response.data;
   },
   (error) => {
-    const message =
-      error.response?.data?.message ||
-      error.message ||
-      'Đã có lỗi xảy ra khi kết nối máy chủ';
+    let message: string;
+    if (error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK' || !error.response) {
+      message = 'Không thể kết nối máy chủ. Máy chủ có thể đang khởi động lại (30s), vui lòng thử lại!';
+    } else {
+      message =
+        error.response?.data?.message ||
+        error.message ||
+        'Đã có lỗi xảy ra khi kết nối máy chủ';
+    }
     return Promise.reject(new Error(message));
   },
 );

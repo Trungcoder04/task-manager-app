@@ -25,6 +25,7 @@ export type IconName =
   | 'alert-circle'
   | 'chevron-down'
   | 'chevron-right'
+  | 'chevron-left'
   | 'download'
   | 'camera'
   | 'upload'
@@ -176,6 +177,8 @@ export const Icon: React.FC<IconProps> = ({
         return <polyline points="6 9 12 15 18 9" />;
       case 'chevron-right':
         return <polyline points="9 18 15 12 9 6" />;
+      case 'chevron-left':
+        return <polyline points="15 18 9 12 15 6" />;
       case 'download':
         return (
           <>

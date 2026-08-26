@@ -45,6 +45,14 @@ export class CreateTaskDto {
   @IsOptional()
   assigneeId?: number;
 
+  @IsInt()
+  @IsOptional()
+  assignerId?: number;
+
+  @IsInt()
+  @IsOptional()
+  createdById?: number;
+
   @IsOptional()
   @Type(() => Number)
   orderIndex?: number;

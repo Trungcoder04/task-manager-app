@@ -27,7 +27,7 @@ export const MemberManagementModal: React.FC<MemberManagementModalProps> = ({
 }) => {
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<number | ''>('');
-  const [selectedRole, setSelectedRole] = useState<ProjectMemberRoleType>(2);
+  const [selectedRole, setSelectedRole] = useState<ProjectMemberRoleType>(3);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -91,12 +91,13 @@ export const MemberManagementModal: React.FC<MemberManagementModalProps> = ({
 
             <select
               className="form-select"
-              style={{ flex: 1, minWidth: '120px' }}
+              style={{ flex: 1, minWidth: '130px' }}
               value={selectedRole}
               onChange={(e) => setSelectedRole(Number(e.target.value) as ProjectMemberRoleType)}
             >
-              <option value={2}>MEMBER</option>
-              <option value={1}>ADMIN</option>
+              <option value={3}>Nhân viên (Member)</option>
+              <option value={2}>Trưởng nhóm (Lead)</option>
+              <option value={1}>Quản trị (Admin)</option>
             </select>
 
             <Button
@@ -163,7 +164,7 @@ export const MemberManagementModal: React.FC<MemberManagementModalProps> = ({
                           borderRadius: 'var(--radius-full)',
                         }}
                       >
-                        OWNER
+                        CHỦ DỰ ÁN
                       </span>
                     ) : (
                       <select
@@ -178,8 +179,9 @@ export const MemberManagementModal: React.FC<MemberManagementModalProps> = ({
                           )
                         }
                       >
-                        <option value={1}>ADMIN</option>
-                        <option value={2}>MEMBER</option>
+                        <option value={3}>Nhân viên (Member)</option>
+                        <option value={2}>Trưởng nhóm (Lead)</option>
+                        <option value={1}>Quản trị (Admin)</option>
                       </select>
                     )}
 

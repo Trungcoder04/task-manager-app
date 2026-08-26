@@ -10,12 +10,12 @@ interface TaskBoardProps {
 }
 
 export const KANBAN_COLUMNS: { id: TaskStatusType; title: string; color: string }[] = [
-  { id: TaskStatus.PENDING, title: 'Pending', color: '#f59e0b' },
-  { id: TaskStatus.TODO, title: 'To Do', color: '#6366f1' },
-  { id: TaskStatus.IN_PROGRESS, title: 'In Progress', color: '#3b82f6' },
-  { id: TaskStatus.IN_REVIEW, title: 'In review', color: '#8b5cf6' },
-  { id: TaskStatus.DONE, title: 'Done', color: '#10b981' },
-  { id: TaskStatus.REJECTED, title: 'Rejected', color: '#ef4444' },
+  { id: TaskStatus.PENDING, title: 'Chờ duyệt', color: '#f59e0b' },
+  { id: TaskStatus.TODO, title: 'Cần làm', color: '#6366f1' },
+  { id: TaskStatus.IN_PROGRESS, title: 'Đang làm', color: '#3b82f6' },
+  { id: TaskStatus.IN_REVIEW, title: 'Chờ nghiệm thu', color: '#8b5cf6' },
+  { id: TaskStatus.DONE, title: 'Hoàn thành', color: '#10b981' },
+  { id: TaskStatus.REJECTED, title: 'Bị từ chối', color: '#ef4444' },
 ];
 export const TaskBoard: React.FC<TaskBoardProps> = ({
   tasks,

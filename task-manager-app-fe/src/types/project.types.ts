@@ -2,7 +2,8 @@ import { User } from './user.types';
 
 export const ProjectMemberRole = {
   ADMIN: 1,
-  MEMBER: 2,
+  LEAD: 2,
+  MEMBER: 3,
 } as const;
 
 export type ProjectMemberRoleType = (typeof ProjectMemberRole)[keyof typeof ProjectMemberRole];

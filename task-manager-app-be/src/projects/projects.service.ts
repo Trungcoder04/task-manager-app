@@ -39,6 +39,29 @@ export class ProjectsService {
     });
   }
 
+  private async canUserManageProject(projectId: number, userId: number): Promise<boolean> {
+    const systemUser = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    if (systemUser && systemUser.role === 1) return true;
+
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: {
+        ownerId: true,
+        members: {
+          where: { userId },
+          select: { role: true },
+        },
+      },
+    });
+    if (!project) return false;
+    if (project.ownerId === userId) return true;
+    if (project.members.length > 0 && project.members[0].role === 1) return true;
+    return false;
+  }
+
   // 3. Xem chi tiết 1 dự án
   async getProjectById(projectId: number, userId: number) {
     const project = await this.prisma.project.findUnique({
@@ -48,7 +71,12 @@ export class ProjectsService {
 
     if (!project) throw new NotFoundException('Không tìm thấy dự án');
 
-    const isMemberOrOwner = project.ownerId === userId || project.members.some(m => m.userId === userId);
+    const systemUser = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+
+    const isMemberOrOwner = systemUser?.role === 1 || project.ownerId === userId || project.members.some(m => m.userId === userId);
     if (!isMemberOrOwner) {
       throw new ForbiddenException('Bạn không có quyền truy cập dự án này');
     }
@@ -56,14 +84,15 @@ export class ProjectsService {
     return project;
   }
 
-  // 4. Cập nhật dự án (Chỉ Owner)
+  // 4. Cập nhật dự án
   async updateProject(projectId: number, data: ProjectUpdateRequestDto, userId: number) {
+    const canManage = await this.canUserManageProject(projectId, userId);
+    if (!canManage) {
+      throw new ForbiddenException('Chỉ Quản trị viên hoặc Chủ dự án mới được phép chỉnh sửa');
+    }
+
     const project = await this.prisma.project.findUnique({ where: { id: projectId } });
     if (!project) throw new NotFoundException('Không tìm thấy dự án');
-    
-    if (project.ownerId !== userId) {
-      throw new ForbiddenException('Chỉ Chủ dự án mới được phép chỉnh sửa');
-    }
 
     return this.prisma.project.update({
       where: { id: projectId },
@@ -75,29 +104,34 @@ export class ProjectsService {
     });
   }
 
-  // 5. Xóa dự án (Chỉ Owner)
+  // 5. Xóa dự án
   async deleteProject(projectId: number, userId: number) {
-    const project = await this.prisma.project.findUnique({ where: { id: projectId } });
-    if (!project) throw new NotFoundException('Không tìm thấy dự án');
-    
-    if (project.ownerId !== userId) {
-      throw new ForbiddenException('Chỉ Chủ dự án mới được phép xóa');
+    const canManage = await this.canUserManageProject(projectId, userId);
+    if (!canManage) {
+      throw new ForbiddenException('Chỉ Quản trị viên hoặc Chủ dự án mới được phép xóa');
     }
 
-    // Prisma: Nếu bạn chưa set onDelete: Cascade trong schema, bạn phải xóa members trước
+    const project = await this.prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) throw new NotFoundException('Không tìm thấy dự án');
+
     await this.prisma.projectMember.deleteMany({ where: { projectId } });
     await this.prisma.project.delete({ where: { id: projectId } });
     
-    return null; // Trả về null cho API delete
+    return null;
   }
 
   // --- QUẢN LÝ THÀNH VIÊN ---
 
-  // 6. Thêm thành viên (Chỉ Owner)
-  async addMember(projectId: number, data: ProjectMemberRequestDto, ownerId: number) {
+  // 6. Thêm thành viên
+  async addMember(projectId: number, data: ProjectMemberRequestDto, currentUserId: number) {
     if (!data.userId) {
       throw new BadRequestException('Vui lòng cung cấp userId của thành viên cần thêm');
     }
+    const canManage = await this.canUserManageProject(projectId, currentUserId);
+    if (!canManage) {
+      throw new ForbiddenException('Chỉ Quản trị viên hoặc Chủ dự án mới được thêm thành viên');
+    }
+
     const targetUser = await this.prisma.user.findUnique({
       where: { id: data.userId }
     });
@@ -109,7 +143,6 @@ export class ProjectsService {
       include: { members: true }
     });
     if (!project) throw new NotFoundException('Không tìm thấy dự án');
-    if (project.ownerId !== ownerId) throw new ForbiddenException('Chỉ Chủ dự án mới được thêm thành viên');
 
     const isAlreadyMember = project.members.some(m => m.userId === data.userId);
     if (isAlreadyMember) throw new ForbiddenException('Người dùng đã là thành viên của dự án');
@@ -118,19 +151,25 @@ export class ProjectsService {
       data: {
         projectId,
         userId: data.userId,
-        role: data.role,
+        role: data.role || 3,
       }
     });
 
-    return this.getProjectById(projectId, ownerId); // Trả về project mới nhất
+    return this.getProjectById(projectId, currentUserId);
   }
 
-  // 7. Cập nhật quyền thành viên (Chỉ Owner)
-  async updateMemberRole(projectId: number, targetUserId: number, data: ProjectMemberRequestDto, ownerId: number) {
+  // 7. Cập nhật quyền thành viên
+  async updateMemberRole(projectId: number, targetUserId: number, data: ProjectMemberRequestDto, currentUserId: number) {
+    const canManage = await this.canUserManageProject(projectId, currentUserId);
+    if (!canManage) {
+      throw new ForbiddenException('Chỉ Quản trị viên hoặc Chủ dự án mới được sửa quyền');
+    }
+
     const project = await this.prisma.project.findUnique({ where: { id: projectId } });
     if (!project) throw new NotFoundException('Không tìm thấy dự án');
-    if (project.ownerId !== ownerId) throw new ForbiddenException('Chỉ Chủ dự án mới được sửa quyền');
-    if (project.ownerId === targetUserId) throw new ForbiddenException('Không thể tự sửa quyền của Chủ dự án');
+    if (project.ownerId === targetUserId && project.ownerId !== currentUserId) {
+      throw new ForbiddenException('Không thể sửa quyền của Chủ dự án');
+    }
 
     await this.prisma.projectMember.update({
       where: {
@@ -139,14 +178,18 @@ export class ProjectsService {
       data: { role: data.role }
     });
 
-    return this.getProjectById(projectId, ownerId);
+    return this.getProjectById(projectId, currentUserId);
   }
 
-  // 8. Xóa thành viên (Chỉ Owner)
-  async removeMember(projectId: number, targetUserId: number, ownerId: number) {
+  // 8. Xóa thành viên
+  async removeMember(projectId: number, targetUserId: number, currentUserId: number) {
+    const canManage = await this.canUserManageProject(projectId, currentUserId);
+    if (!canManage) {
+      throw new ForbiddenException('Chỉ Quản trị viên hoặc Chủ dự án mới được xóa thành viên');
+    }
+
     const project = await this.prisma.project.findUnique({ where: { id: projectId } });
     if (!project) throw new NotFoundException('Không tìm thấy dự án');
-    if (project.ownerId !== ownerId) throw new ForbiddenException('Chỉ Chủ dự án mới được xóa thành viên');
     if (project.ownerId === targetUserId) throw new ForbiddenException('Không thể xóa Chủ dự án');
 
     await this.prisma.projectMember.delete({
@@ -155,6 +198,6 @@ export class ProjectsService {
       }
     });
 
-    return this.getProjectById(projectId, ownerId);
+    return this.getProjectById(projectId, currentUserId);
   }
 }

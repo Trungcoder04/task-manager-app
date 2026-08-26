@@ -42,7 +42,7 @@ export const TaskStatusActions: React.FC<TaskStatusActionsProps> = ({
                   isLoading={isLoading}
                   onClick={() => handleAction(TaskStatus.TODO)}
                 >
-                  Duyệt Task (Vào TODO)
+                  ⚡ Phê duyệt & Giao việc
                 </Button>
                 <Button
                   variant="danger"

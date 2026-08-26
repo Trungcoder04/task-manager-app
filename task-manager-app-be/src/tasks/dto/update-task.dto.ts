@@ -40,6 +40,10 @@ export class UpdateTaskDto {
   @IsOptional()
   assigneeId?: number;
 
+  @IsInt()
+  @IsOptional()
+  assignerId?: number;
+
   @IsOptional()
   @Type(() => Number)
   orderIndex?: number;

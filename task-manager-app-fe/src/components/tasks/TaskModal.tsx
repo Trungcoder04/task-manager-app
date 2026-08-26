@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Task, TaskPriorityType, TaskStatusType, CreateTaskRequest, UpdateTaskRequest, TaskStatus } from '../../types/task.types';
 import { User } from '../../types/user.types';
 import { Label } from '../../types/label.types';
-import { ProjectMemberRoleType } from '../../types/project.types';
+import { ProjectMember, ProjectMemberRoleType } from '../../types/project.types';
 import { Button } from '../common/Button';
 import { Icon } from '../common/Icon';
 import { ConfirmModal } from '../common/ConfirmModal';
@@ -17,6 +17,7 @@ interface TaskModalProps {
   task?: Task | null;
   projectId: number;
   members: User[];
+  projectMembers?: ProjectMember[];
   labels: Label[];
   initialStatus?: TaskStatusType;
   userRole?: ProjectMemberRoleType;
@@ -36,6 +37,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   task,
   projectId,
   members,
+  projectMembers,
   labels,
   initialStatus = 1,
   userRole,
@@ -54,11 +56,25 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const [priority, setPriority] = useState<TaskPriorityType>(2);
   const [dueDate, setDueDate] = useState('');
   const [assigneeId, setAssigneeId] = useState<number | ''>('');
+  const [assignerId, setAssignerId] = useState<number | ''>('');
   const [selectedLabelIds, setSelectedLabelIds] = useState<number[]>([]);
   const [isSelectingLabels, setIsSelectingLabels] = useState(false);
   const [activeTab, setActiveTab] = useState<'comments' | 'attachments' | 'activities'>('comments');
   const [isLoading, setIsLoading] = useState(false);
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
+
+  // Chỉ lấy những tài khoản có chức vụ Quản trị (Admin - 1) hoặc Trưởng nhóm (Lead - 2) để làm Người giao việc
+  const assignerCandidates = useMemo(() => {
+    if (!projectMembers || projectMembers.length === 0) {
+      return members.filter((m) => m.role === 1);
+    }
+    const list = members.filter((m) => {
+      const pm = projectMembers.find((p) => p.userId === m.id);
+      if (!pm) return m.role === 1; // System Admin
+      return pm.role === 1 || pm.role === 2 || m.role === 1;
+    });
+    return list.length > 0 ? list : members;
+  }, [members, projectMembers]);
 
   const [commentsCount, setCommentsCount] = useState<number>(0);
   const [attachmentsCount, setAttachmentsCount] = useState<number>(0);
@@ -72,6 +88,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setPriority(task.priority);
       setDueDate(task.dueDate ? task.dueDate.split('T')[0] : '');
       setAssigneeId(task.assigneeId || '');
+      setAssignerId(task.assignerId || task.createdById || '');
       setSelectedLabelIds((task.labels || []).map((l) => l.id));
 
       if (task.comments !== undefined) {
@@ -98,13 +115,17 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setPriority(2);
       setDueDate('');
       setAssigneeId('');
+      setAssignerId('');
       setSelectedLabelIds([]);
       setCommentsCount(0);
       setAttachmentsCount(0);
       setActivitiesCount(0);
     }
+    setTitleError('');
     setIsSelectingLabels(false);
   }, [task, initialStatus, isOpen]);
+
+  const [titleError, setTitleError] = useState('');
 
   if (!isOpen) return null;
 
@@ -112,11 +133,20 @@ export const TaskModal: React.FC<TaskModalProps> = ({
 
   const handleSave = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!title.trim()) return;
+    if (!title.trim()) {
+      setTitleError('Vui lòng nhập tiêu đề công việc');
+      return;
+    }
+    if (title.trim().length < 2) {
+      setTitleError('Tiêu đề công việc phải có ít nhất 2 ký tự');
+      return;
+    }
+    setTitleError('');
 
     if (isEditing && task) {
       const originalDueDate = task.dueDate ? task.dueDate.split('T')[0] : '';
       const originalAssigneeId = task.assigneeId || '';
+      const originalAssignerId = task.assignerId || '';
       const originalLabelIds = (task.labels || []).map((l) => l.id).sort().join(',');
       const currentLabelIds = [...selectedLabelIds].sort().join(',');
 
@@ -126,6 +156,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       const hasPriorityChanged = priority !== task.priority;
       const hasDueDateChanged = (dueDate || '') !== originalDueDate;
       const hasAssigneeChanged = (assigneeId || '') !== originalAssigneeId;
+      const hasAssignerChanged = (assignerId || '') !== originalAssignerId;
       const hasLabelsChanged = originalLabelIds !== currentLabelIds;
 
       // Nếu không có bất kỳ thay đổi nào -> đóng modal ngay, không gọi API!
@@ -136,6 +167,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
         !hasPriorityChanged &&
         !hasDueDateChanged &&
         !hasAssigneeChanged &&
+        !hasAssignerChanged &&
         !hasLabelsChanged
       ) {
         onClose();
@@ -151,6 +183,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           priority,
           dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
           assigneeId: assigneeId ? Number(assigneeId) : null,
+          assignerId: assignerId ? Number(assignerId) : null,
           labelIds: selectedLabelIds,
         });
         onClose();
@@ -168,6 +201,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           priority,
           dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
           assigneeId: assigneeId ? Number(assigneeId) : undefined,
+          assignerId: assignerId ? Number(assignerId) : undefined,
           labelIds: selectedLabelIds,
         });
         onClose();
@@ -271,18 +305,38 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               <input
                 type="text"
                 className="form-input"
-                placeholder="Tiêu đề công việc..."
+                placeholder="Tiêu đề công việc (Bắt buộc)..."
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                required
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  if (titleError) setTitleError('');
+                }}
                 disabled={isLoading}
                 style={{
                   fontSize: '1rem',
                   fontWeight: 600,
                   backgroundColor: 'var(--bg-surface)',
                   padding: '0.625rem 0.875rem',
+                  borderColor: titleError ? 'var(--priority-high)' : undefined,
+                  boxShadow: titleError ? '0 0 0 3px rgba(239, 68, 68, 0.15)' : undefined,
                 }}
               />
+              {titleError && (
+                <div
+                  style={{
+                    color: 'var(--priority-high)',
+                    fontSize: '0.78125rem',
+                    fontWeight: 600,
+                    marginTop: '0.35rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                  }}
+                >
+                  <Icon name="alert-circle" size={14} />
+                  <span>{titleError}</span>
+                </div>
+              )}
             </div>
 
             {/* Notification Banner for Rework or Rejected tasks */}
@@ -380,12 +434,12 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                   disabled={isLoading}
                   style={{ fontSize: '0.8125rem', padding: '0.45rem 0.65rem' }}
                 >
-                  <option value={0}>PENDING </option>
-                  <option value={1}>TODO </option>
-                  <option value={2}>IN_PROGRESS </option>
-                  <option value={3}>IN_REVIEW </option>
-                  <option value={4}>DONE </option>
-                  <option value={5}>REJECTED </option>
+                  <option value={0}>Chờ duyệt</option>
+                  <option value={1}>Cần làm</option>
+                  <option value={2}>Đang làm</option>
+                  <option value={3}>Chờ nghiệm thu</option>
+                  <option value={4}>Hoàn thành</option>
+                  <option value={5}>Bị từ chối</option>
                 </select>
               </div>
 
@@ -401,9 +455,34 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                   disabled={isLoading}
                   style={{ fontSize: '0.8125rem', padding: '0.45rem 0.65rem' }}
                 >
-                  <option value={3}>Cao </option>
-                  <option value={2}>Trung bình </option>
-                  <option value={1}>Thấp </option>
+                  <option value={3}>Cao</option>
+                  <option value={2}>Trung bình</option>
+                  <option value={1}>Thấp</option>
+                </select>
+              </div>
+
+              {/* Người giao việc (Chỉ hiển thị Cấp trên: Admin & Trưởng nhóm Lead) */}
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label" style={{ fontSize: '0.75rem', marginBottom: '0.25rem', color: 'var(--text-muted)' }}>
+                  Người giao việc
+                </label>
+                <select
+                  className="form-select"
+                  value={assignerId}
+                  onChange={(e) => setAssignerId(e.target.value ? Number(e.target.value) : '')}
+                  disabled={isLoading}
+                  style={{ fontSize: '0.8125rem', padding: '0.45rem 0.65rem' }}
+                >
+                  <option value="">-- Cấp trên chỉ định --</option>
+                  {assignerCandidates.map((m) => {
+                    const pm = projectMembers?.find((p) => p.userId === m.id);
+                    const roleName = pm?.role === 1 || m.role === 1 ? 'Admin' : 'Trưởng nhóm';
+                    return (
+                      <option key={m.id} value={m.id}>
+                        {m.fullName} ({roleName})
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 

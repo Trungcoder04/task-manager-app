@@ -23,6 +23,8 @@ model User {
   ownedProjects  Project[]        @relation("ProjectOwner")
   projectMembers ProjectMember[]
   assignedTasks  Task[]           @relation("TaskAssignee")
+  assignedByMe   Task[]           @relation("TaskAssigner")
+  createdTasks   Task[]           @relation("TaskCreator")
   attachments    TaskAttachment[]
   comments       TaskComment[]
   activities     TaskActivity[]
@@ -48,7 +50,7 @@ model Project {
 model ProjectMember {
   projectId Int      @map("ProjectId")
   userId    Int      @map("UserId")
-  role      Int      @default(2) @map("Role") // 1: Admin, 2: Member
+  role      Int      @default(3) @map("Role") // 1: OWNER (Chủ dự án), 2: LEAD (Trưởng nhóm), 3: MEMBER (Nhân viên)
   joinedAt  DateTime @default(now()) @map("JoinedAt")
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -63,18 +65,24 @@ model Task {
   projectId   Int       @map("ProjectId")
   title       String    @db.VarChar(255) @map("Title")
   description String?   @db.Text @map("Description")
-  status      Int       @default(0) @map("Status") // 0: PENDING, 1: TODO, 2: IN_PROGRESS, 3: IN_REVIEW, 4: DONE, 5: REJECTED
+  status      Int       @default(0) @map("Status") // -1: DRAFT, 0: PENDING_APPROVAL, 1: TODO, 2: IN_PROGRESS, 3: IN_REVIEW, 4: DONE, 5: REJECTED
   priority    Int       @default(2) @map("Priority") // 1: LOW, 2: MEDIUM, 3: HIGH
   dueDate     DateTime? @map("DueDate")
   assigneeId  Int?      @map("AssigneeId")
+  assignerId  Int?      @map("AssignerId")
+  createdById Int?      @map("CreatedById")
   orderIndex  Float     @default(0) @map("OrderIndex")
   createdAt   DateTime  @default(now()) @map("CreatedAt")
+
   project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
   assignee    User?            @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  assigner    User?            @relation("TaskAssigner", fields: [assignerId], references: [id], onDelete: SetNull)
+  createdBy   User?            @relation("TaskCreator", fields: [createdById], references: [id], onDelete: SetNull)
   taskLabels  TaskLabel[]
   attachments TaskAttachment[]
   comments    TaskComment[]
   activities  TaskActivity[]
+
   @@map("Tasks")
 }
 model Label {

@@ -32,6 +32,10 @@ export interface TaskResponse {
     dueDate: Date | null;
     assigneeId?: number | null;
     assignee?: AssigneeResponse | null;
+    assignerId?: number | null;
+    assigner?: AssigneeResponse | null;
+    createdById?: number | null;
+    createdBy?: AssigneeResponse | null;
     orderIndex: number;
     createdAt: Date;
     activities?: TaskActivityResponse[];
