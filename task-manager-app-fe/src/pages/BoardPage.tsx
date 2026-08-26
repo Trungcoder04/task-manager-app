@@ -42,6 +42,9 @@ interface BoardPageProps {
   onGoToProjects: () => void;
   selectedTask?: Task | null;
   onClearSelectedTask?: () => void;
+  onRequestExtension?: (taskId: number, newDueDate: string, reason: string) => Promise<unknown>;
+  onReviewExtension?: (taskId: number, extensionId: number, status: number, reviewNote?: string) => Promise<unknown>;
+  currentUserId?: number;
 }
 
 export const BoardPage: React.FC<BoardPageProps> = ({
@@ -65,6 +68,9 @@ export const BoardPage: React.FC<BoardPageProps> = ({
   onDeleteAttachment,
   onCreateLabel,
   onDeleteLabel,
+  onRequestExtension,
+  onReviewExtension,
+  currentUserId,
   onGoToProjects,
   selectedTask: externalSelectedTask,
   onClearSelectedTask,
@@ -186,6 +192,9 @@ export const BoardPage: React.FC<BoardPageProps> = ({
         onAddAttachment={onAddAttachment}
         onUploadAttachment={onUploadAttachment}
         onDeleteAttachment={onDeleteAttachment}
+        onRequestExtension={onRequestExtension}
+        onReviewExtension={onReviewExtension}
+        currentUserId={currentUserId}
       />
 
       {/* Label Management Modal */}

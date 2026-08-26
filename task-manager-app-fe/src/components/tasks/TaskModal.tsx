@@ -29,6 +29,9 @@ interface TaskModalProps {
   onAddAttachment: (taskId: number, fileName: string, fileUrl: string) => Promise<unknown>;
   onUploadAttachment?: (taskId: number, file: File) => Promise<unknown>;
   onDeleteAttachment: (attachmentId: number, taskId: number) => Promise<void>;
+  onRequestExtension?: (taskId: number, newDueDate: string, reason: string) => Promise<unknown>;
+  onReviewExtension?: (taskId: number, extensionId: number, status: number, reviewNote?: string) => Promise<unknown>;
+  currentUserId?: number;
 }
 
 export const TaskModal: React.FC<TaskModalProps> = ({
@@ -49,6 +52,9 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   onAddAttachment,
   onUploadAttachment,
   onDeleteAttachment,
+  onRequestExtension,
+  onReviewExtension,
+  currentUserId,
 }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -62,6 +68,13 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const [activeTab, setActiveTab] = useState<'comments' | 'attachments' | 'activities'>('comments');
   const [isLoading, setIsLoading] = useState(false);
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
+
+  // States cho tính năng Xin gia hạn Deadline
+  const [isExtensionModalOpen, setIsExtensionModalOpen] = useState(false);
+  const [extensionNewDueDate, setExtensionNewDueDate] = useState('');
+  const [extensionReason, setExtensionReason] = useState('');
+  const [extensionError, setExtensionError] = useState('');
+  const [isSubmittingExtension, setIsSubmittingExtension] = useState(false);
 
   // Chỉ lấy những tài khoản có chức vụ Quản trị (Admin - 1) hoặc Trưởng nhóm (Lead - 2) để làm Người giao việc
   const assignerCandidates = useMemo(() => {
@@ -130,6 +143,14 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   if (!isOpen) return null;
 
   const isEditing = !!task;
+
+  // Tính toán quyền và trạng thái xin gia hạn
+  const pendingExtension = task?.extensionRequests?.find((e) => e.status === 0);
+  const isAssignee = !!(isEditing && task?.assigneeId && currentUserId && task.assigneeId === currentUserId);
+  const isAssigner = !!(isEditing && task?.assignerId && currentUserId && task.assignerId === currentUserId);
+  const isAdminOrLead = userRole === 1 || userRole === 2;
+  const canReviewExtension = isAssigner || isAdminOrLead;
+  const canRequestExtension = isAssignee && task?.status !== TaskStatus.DONE && !pendingExtension;
 
   const handleSave = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -386,6 +407,89 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               </div>
             )}
 
+            {/* Notification Banner for Pending Extension Request */}
+            {isEditing && pendingExtension && (
+              <div
+                style={{
+                  marginBottom: '1rem',
+                  padding: '0.85rem 1rem',
+                  backgroundColor: 'rgba(245, 158, 11, 0.12)',
+                  border: '1.5px solid rgba(245, 158, 11, 0.4)',
+                  borderRadius: 'var(--radius-lg)',
+                  color: 'var(--text-primary)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.6rem',
+                  boxShadow: '0 2px 8px rgba(245, 158, 11, 0.15)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontWeight: 700, color: '#b45309', fontSize: '0.875rem' }}>
+                    <span style={{ fontSize: '1.2rem' }}>⏳</span>
+                    <span>YÊU CẦU XIN GIA HẠN DEADLINE (ĐANG CHỜ DUYỆT)</span>
+                  </div>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    Gửi bởi: <strong style={{ color: 'var(--text-primary)' }}>{pendingExtension.requestedBy?.fullName || pendingExtension.requestedBy?.username || 'Thành viên'}</strong>
+                  </span>
+                </div>
+
+                <div style={{ fontSize: '0.8125rem', lineHeight: 1.6, backgroundColor: 'var(--bg-surface)', padding: '0.6rem 0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(245, 158, 11, 0.25)' }}>
+                  <div>
+                    📅 <strong>Hạn chót mới đề xuất:</strong>{' '}
+                    <span style={{ color: '#d97706', fontWeight: 700, fontSize: '0.9rem' }}>
+                      {pendingExtension.newDueDate.split('T')[0]}
+                    </span>{' '}
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                      (Hạn cũ: {pendingExtension.oldDueDate ? pendingExtension.oldDueDate.split('T')[0] : 'Chưa có'})
+                    </span>
+                  </div>
+                  <div style={{ marginTop: '0.25rem' }}>
+                    📝 <strong>Lý do xin gia hạn:</strong> <em style={{ color: 'var(--text-secondary)' }}>"{pendingExtension.reason}"</em>
+                  </div>
+                </div>
+
+                {canReviewExtension && onReviewExtension && task && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginTop: '0.15rem' }}>
+                    <Button
+                      variant="success"
+                      size="sm"
+                      icon="check"
+                      isLoading={isLoading}
+                      onClick={async () => {
+                        setIsLoading(true);
+                        try {
+                          await onReviewExtension(task.id, pendingExtension.id, 1);
+                        } finally {
+                          setIsLoading(false);
+                        }
+                      }}
+                    >
+                      Chấp thuận gia hạn
+                    </Button>
+
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      icon="x"
+                      isLoading={isLoading}
+                      onClick={async () => {
+                        const note = window.prompt('Nhập lý do từ chối gia hạn (Tùy chọn):');
+                        if (note === null) return;
+                        setIsLoading(true);
+                        try {
+                          await onReviewExtension(task.id, pendingExtension.id, 2, note);
+                        } finally {
+                          setIsLoading(false);
+                        }
+                      }}
+                    >
+                      Từ chối
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Quick Status Action Banner based on Role */}
             {isEditing && task && onUpdateStatus && userRole !== undefined && (
               <div
@@ -509,16 +613,51 @@ export const TaskModal: React.FC<TaskModalProps> = ({
 
               {/* Hạn chót */}
               <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label" style={{ fontSize: '0.75rem', marginBottom: '0.25rem', color: 'var(--text-muted)' }}>
-                  Hạn chót
-                </label>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                  <label className="form-label" style={{ fontSize: '0.75rem', margin: 0, color: 'var(--text-muted)' }}>
+                    Hạn chót
+                  </label>
+                  {canRequestExtension && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setExtensionNewDueDate('');
+                        setExtensionReason('');
+                        setExtensionError('');
+                        setIsExtensionModalOpen(true);
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#d97706',
+                        fontSize: '0.725rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        padding: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.2rem',
+                        textDecoration: 'underline',
+                      }}
+                    >
+                      <Icon name="clock" size={12} />
+                      <span>Xin gia hạn</span>
+                    </button>
+                  )}
+                </div>
                 <input
                   type="date"
                   className="form-input"
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
-                  disabled={isLoading}
-                  style={{ fontSize: '0.8125rem', padding: '0.45rem 0.65rem' }}
+                  disabled={isLoading || (isAssignee && !canReviewExtension && task?.assigneeId !== task?.assignerId)}
+                  style={{
+                    fontSize: '0.8125rem',
+                    padding: '0.45rem 0.65rem',
+                    cursor: (isAssignee && !canReviewExtension && task?.assigneeId !== task?.assignerId) ? 'not-allowed' : 'pointer',
+                    opacity: (isAssignee && !canReviewExtension && task?.assigneeId !== task?.assignerId) ? 0.8 : 1,
+                  }}
+                  title={(isAssignee && !canReviewExtension && task?.assigneeId !== task?.assignerId) ? 'Người thực hiện không thể tự ý sửa trực tiếp hạn chót. Hãy bấm "Xin gia hạn" ở trên!' : undefined}
                 />
               </div>
             </div>
@@ -777,6 +916,178 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           message={`Bạn có chắc chắn muốn xóa công việc #${task.id} "${task.title}"? Hành động này không thể hoàn tác.`}
           confirmText="Xóa công việc"
         />
+      )}
+
+      {/* Modal Xin gia hạn Deadline */}
+      {isExtensionModalOpen && task && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            padding: '1rem',
+          }}
+          onClick={() => {
+            if (!isSubmittingExtension) setIsExtensionModalOpen(false);
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: 'var(--bg-surface)',
+              borderRadius: 'var(--radius-xl)',
+              border: '1px solid var(--border-color)',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2)',
+              width: '100%',
+              maxWidth: '480px',
+              padding: '1.5rem',
+              animation: 'modalSlideUp 0.2s ease-out',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: '1.25rem' }}>⏰</span>
+                <h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  Xin gia hạn Deadline
+                </h3>
+              </div>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                style={{ padding: '0.25rem', color: 'var(--text-muted)' }}
+                onClick={() => setIsExtensionModalOpen(false)}
+                disabled={isSubmittingExtension}
+              >
+                <Icon name="x" size={18} />
+              </button>
+            </div>
+
+            <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '1.25rem', lineHeight: 1.5 }}>
+              Gửi đề xuất gia hạn thời gian hoàn thành công việc <strong>"{task.title}"</strong> đến Người giao việc / Quản trị viên.
+            </p>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!extensionNewDueDate) {
+                  setExtensionError('Vui lòng chọn hạn chót mới');
+                  return;
+                }
+                if (task.dueDate) {
+                  const oldD = new Date(task.dueDate).setHours(0, 0, 0, 0);
+                  const newD = new Date(extensionNewDueDate).setHours(0, 0, 0, 0);
+                  if (newD <= oldD) {
+                    setExtensionError('Hạn chót mới phải sau hạn chót hiện tại');
+                    return;
+                  }
+                }
+                if (!extensionReason.trim() || extensionReason.trim().length < 5) {
+                  setExtensionError('Lý do xin gia hạn phải có ít nhất 5 ký tự');
+                  return;
+                }
+                setExtensionError('');
+                setIsSubmittingExtension(true);
+                try {
+                  if (onRequestExtension) {
+                    await onRequestExtension(task.id, extensionNewDueDate, extensionReason.trim());
+                  }
+                  setIsExtensionModalOpen(false);
+                } catch (err) {
+                  const msg = err instanceof Error ? err.message : 'Gửi yêu cầu thất bại';
+                  setExtensionError(msg);
+                } finally {
+                  setIsSubmittingExtension(false);
+                }
+              }}
+            >
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label className="form-label" style={{ fontSize: '0.8125rem', fontWeight: 600, marginBottom: '0.35rem' }}>
+                  Hạn chót đề xuất mới <span style={{ color: 'var(--priority-high)' }}>*</span>
+                </label>
+                <input
+                  type="date"
+                  className="form-input"
+                  value={extensionNewDueDate}
+                  onChange={(e) => {
+                    setExtensionNewDueDate(e.target.value);
+                    if (extensionError) setExtensionError('');
+                  }}
+                  disabled={isSubmittingExtension}
+                  required
+                  style={{ fontSize: '0.875rem' }}
+                />
+                {task.dueDate && (
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem', display: 'block' }}>
+                    (Hạn chót hiện tại: {task.dueDate.split('T')[0]})
+                  </span>
+                )}
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                <label className="form-label" style={{ fontSize: '0.8125rem', fontWeight: 600, marginBottom: '0.35rem' }}>
+                  Lý do xin gia hạn <span style={{ color: 'var(--priority-high)' }}>*</span>
+                </label>
+                <textarea
+                  className="form-textarea"
+                  placeholder="Nêu rõ lý do cần thêm thời gian (khối lượng phát sinh, gặp vấn đề kỹ thuật, chờ phản hồi khách hàng...)..."
+                  value={extensionReason}
+                  onChange={(e) => {
+                    setExtensionReason(e.target.value);
+                    if (extensionError) setExtensionError('');
+                  }}
+                  disabled={isSubmittingExtension}
+                  rows={3}
+                  required
+                  style={{ fontSize: '0.875rem', resize: 'vertical' }}
+                />
+              </div>
+
+              {extensionError && (
+                <div
+                  style={{
+                    padding: '0.5rem 0.75rem',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    borderRadius: 'var(--radius-md)',
+                    color: 'var(--priority-high)',
+                    fontSize: '0.8125rem',
+                    marginBottom: '1rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                  }}
+                >
+                  <Icon name="alert-circle" size={14} />
+                  <span>{extensionError}</span>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setIsExtensionModalOpen(false)}
+                  disabled={isSubmittingExtension}
+                >
+                  Hủy
+                </Button>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  icon="check"
+                  isLoading={isSubmittingExtension}
+                >
+                  Gửi yêu cầu gia hạn
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

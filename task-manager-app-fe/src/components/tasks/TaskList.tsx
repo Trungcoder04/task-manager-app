@@ -75,9 +75,11 @@ export const TaskList: React.FC<TaskListProps> = ({
         border: '1px solid var(--border-color)',
         overflow: 'hidden',
         boxShadow: '0 8px 30px rgba(0, 0, 0, 0.04)',
-        marginTop: '1rem',
+        marginTop: '0.25rem',
         display: 'flex',
         flexDirection: 'column',
+        flex: 1,
+        minHeight: 0,
       }}
     >
       {/* 🔄 Khu vực cuộn riêng cho Bảng dữ liệu (Không cuộn cả trang) */}
@@ -85,8 +87,8 @@ export const TaskList: React.FC<TaskListProps> = ({
         style={{
           overflowX: 'auto',
           overflowY: 'auto',
-          maxHeight: 'calc(100vh - 290px)',
-          minHeight: '260px',
+          flex: 1,
+          minHeight: '220px',
         }}
       >
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
@@ -130,6 +132,7 @@ export const TaskList: React.FC<TaskListProps> = ({
               paginatedTasks.map((task) => {
                 const priorityInfo = getPriorityBadge(task.priority);
                 const overdue = isOverdue(task.dueDate, task.status);
+                const hasPendingExtension = task.extensionRequests?.some((e) => e.status === 0);
 
                 return (
                   <tr
@@ -144,9 +147,30 @@ export const TaskList: React.FC<TaskListProps> = ({
                     {/* Cột 1: Tên công việc & Labels */}
                     <td style={{ padding: '1.1rem 1.25rem', cursor: 'pointer' }} onClick={() => onSelectTask(task)}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                        <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.925rem' }}>
-                          {task.title}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.925rem' }}>
+                            {task.title}
+                          </span>
+                          {hasPendingExtension && (
+                            <span
+                              style={{
+                                fontSize: '0.68rem',
+                                fontWeight: 700,
+                                backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                                color: '#b45309',
+                                border: '1px solid rgba(245, 158, 11, 0.4)',
+                                borderRadius: '4px',
+                                padding: '0.1rem 0.45rem',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.25rem',
+                              }}
+                              title="Đang có yêu cầu xin gia hạn deadline chờ duyệt"
+                            >
+                              ⏳ Xin gia hạn
+                            </span>
+                          )}
+                        </div>
                         {task.labels && task.labels.length > 0 && (
                           <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
                             {task.labels.map((lbl) => (

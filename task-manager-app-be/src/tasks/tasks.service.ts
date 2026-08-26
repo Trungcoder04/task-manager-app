@@ -8,6 +8,8 @@ import { AppException } from '../common/errors/app.exception';
 import { ErrorCode } from '../common/errors/error-code.enum';
 import { ProjectRole, TaskStatus, TaskStatusName } from './enums/task-status.enum';
 import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
+import { CreateExtensionRequestDto } from './dto/create-extension-request.dto';
+import { ReviewExtensionRequestDto } from './dto/review-extension-request.dto';
 
 @Injectable()
 export class TasksService {
@@ -449,6 +451,27 @@ export class TasksService {
             },
           },
         },
+        extensionRequests: {
+          orderBy: { createdAt: 'desc' },
+          include: {
+            requestedBy: {
+              select: {
+                id: true,
+                username: true,
+                fullName: true,
+                avatar: true,
+              },
+            },
+            reviewedBy: {
+              select: {
+                id: true,
+                username: true,
+                fullName: true,
+                avatar: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -512,6 +535,27 @@ export class TasksService {
           orderBy: { createdAt: 'desc' },
           include: {
             user: {
+              select: {
+                id: true,
+                username: true,
+                fullName: true,
+                avatar: true,
+              },
+            },
+          },
+        },
+        extensionRequests: {
+          orderBy: { createdAt: 'desc' },
+          include: {
+            requestedBy: {
+              select: {
+                id: true,
+                username: true,
+                fullName: true,
+                avatar: true,
+              },
+            },
+            reviewedBy: {
               select: {
                 id: true,
                 username: true,
@@ -926,5 +970,191 @@ export class TasksService {
       completionRate,
       upcomingTasks,
     };
+  }
+
+  /**
+   * Gửi yêu cầu xin gia hạn deadline
+   */
+  async requestExtension(
+    currentUserId: number,
+    taskId: number,
+    dto: CreateExtensionRequestDto,
+  ) {
+    const task = await this.prisma.task.findUnique({
+      where: { id: taskId },
+      include: {
+        extensionRequests: {
+          where: { status: 0 },
+        },
+      },
+    });
+
+    if (!task) {
+      throw new AppException(ErrorCode.TASK_NOT_FOUND);
+    }
+
+    const isMember = await this.isUserInProject(task.projectId, currentUserId);
+    if (!isMember) {
+      throw new AppException(ErrorCode.NOT_PROJECT_MEMBER);
+    }
+
+    if (task.status === TaskStatus.DONE) {
+      throw new AppException(ErrorCode.INVALID_KEY, 'Công việc đã hoàn thành, không thể xin gia hạn.');
+    }
+
+    if (task.extensionRequests && task.extensionRequests.length > 0) {
+      throw new AppException(ErrorCode.INVALID_KEY, 'Công việc đang có yêu cầu gia hạn chờ duyệt. Vui lòng chờ phản hồi!');
+    }
+
+    const newDueDate = new Date(dto.newDueDate);
+    if (isNaN(newDueDate.getTime())) {
+      throw new AppException(ErrorCode.INVALID_KEY, 'Hạn chót mới không hợp lệ.');
+    }
+
+    if (task.dueDate) {
+      const oldTime = new Date(task.dueDate).setHours(0, 0, 0, 0);
+      const newTime = new Date(newDueDate).setHours(0, 0, 0, 0);
+      if (newTime <= oldTime) {
+        throw new AppException(ErrorCode.INVALID_KEY, 'Hạn chót mới phải sau hạn chót hiện tại.');
+      }
+    }
+
+    await this.prisma.taskExtensionRequest.create({
+      data: {
+        taskId,
+        requestedById: currentUserId,
+        oldDueDate: task.dueDate,
+        newDueDate,
+        reason: dto.reason.trim(),
+        status: 0, // PENDING
+      },
+    });
+
+    const formattedOldDate = task.dueDate ? task.dueDate.toISOString().split('T')[0] : 'Chưa có';
+    const formattedNewDate = newDueDate.toISOString().split('T')[0];
+
+    // Ghi log hoạt động
+    await this.prisma.taskActivity.create({
+      data: {
+        taskId,
+        userId: currentUserId,
+        action: `Gửi yêu cầu xin gia hạn deadline đến ${formattedNewDate} (Hạn cũ: ${formattedOldDate}). Lý do: "${dto.reason.trim()}"`,
+      },
+    });
+
+    // Tạo comment thông báo
+    await this.prisma.taskComment.create({
+      data: {
+        taskId,
+        userId: currentUserId,
+        content: `⏰ **[Yêu cầu xin gia hạn]**: Đề xuất dời hạn chót đến ngày **${formattedNewDate}**.\n\n*Lý do:* ${dto.reason.trim()}`,
+      },
+    });
+
+    return this.getTaskById(taskId, currentUserId);
+  }
+
+  /**
+   * Phê duyệt yêu cầu xin gia hạn deadline (Chấp thuận / Từ chối)
+   */
+  async reviewExtension(
+    currentUserId: number,
+    taskId: number,
+    extensionId: number,
+    dto: ReviewExtensionRequestDto,
+  ) {
+    const task = await this.prisma.task.findUnique({
+      where: { id: taskId },
+      include: {
+        extensionRequests: {
+          where: { id: extensionId },
+        },
+      },
+    });
+
+    if (!task) {
+      throw new AppException(ErrorCode.TASK_NOT_FOUND);
+    }
+
+    const extension = task.extensionRequests?.[0];
+    if (!extension) {
+      throw new AppException(ErrorCode.INVALID_KEY, 'Không tìm thấy yêu cầu gia hạn.');
+    }
+
+    if (extension.status !== 0) {
+      throw new AppException(ErrorCode.INVALID_KEY, 'Yêu cầu gia hạn này đã được xử lý trước đó.');
+    }
+
+    // Kiểm tra quyền: Người giao việc (assigner) hoặc Admin/Lead dự án
+    const userRole = await this.getUserProjectRole(task.projectId, currentUserId);
+    const isAssigner = task.assignerId === currentUserId;
+    const isAdminOrLead = userRole === ProjectRole.ADMIN || userRole === ProjectRole.LEAD;
+
+    if (!isAssigner && !isAdminOrLead) {
+      throw new AppException(ErrorCode.UNAUTHORIZED, 'Chỉ Người giao việc hoặc Admin/Lead mới có quyền duyệt yêu cầu gia hạn.');
+    }
+
+    const isApproved = dto.status === 1;
+    const now = new Date();
+    const formattedNewDate = extension.newDueDate.toISOString().split('T')[0];
+
+    // Cập nhật Extension Request
+    await this.prisma.taskExtensionRequest.update({
+      where: { id: extensionId },
+      data: {
+        status: isApproved ? 1 : 2,
+        reviewedById: currentUserId,
+        reviewedAt: now,
+        reviewNote: dto.reviewNote?.trim() || null,
+      },
+    });
+
+    if (isApproved) {
+      // Cập nhật DueDate của Task
+      await this.prisma.task.update({
+        where: { id: taskId },
+        data: {
+          dueDate: extension.newDueDate,
+        },
+      });
+
+      // Log activity
+      await this.prisma.taskActivity.create({
+        data: {
+          taskId,
+          userId: currentUserId,
+          action: `Chấp thuận gia hạn deadline đến ngày ${formattedNewDate}${dto.reviewNote ? ` (Ghi chú: "${dto.reviewNote.trim()}")` : ''}`,
+        },
+      });
+
+      // Tạo comment thông báo
+      await this.prisma.taskComment.create({
+        data: {
+          taskId,
+          userId: currentUserId,
+          content: `✅ **[Đã duyệt gia hạn]**: Hạn chót mới đã được dời đến ngày **${formattedNewDate}**!${dto.reviewNote ? `\n\n*Ghi chú:* ${dto.reviewNote.trim()}` : ''}`,
+        },
+      });
+    } else {
+      // Log activity từ chối
+      await this.prisma.taskActivity.create({
+        data: {
+          taskId,
+          userId: currentUserId,
+          action: `Từ chối yêu cầu gia hạn deadline${dto.reviewNote ? ` (Lý do: "${dto.reviewNote.trim()}")` : ''}`,
+        },
+      });
+
+      // Tạo comment thông báo từ chối
+      await this.prisma.taskComment.create({
+        data: {
+          taskId,
+          userId: currentUserId,
+          content: `❌ **[Từ chối gia hạn]**: Yêu cầu gia hạn deadline đã bị từ chối.${dto.reviewNote ? `\n\n*Lý do:* ${dto.reviewNote.trim()}` : ''}`,
+        },
+      });
+    }
+
+    return this.getTaskById(taskId, currentUserId);
   }
 }

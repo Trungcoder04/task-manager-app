@@ -20,14 +20,16 @@ model User {
   createdAt DateTime @default(now()) @map("CreatedAt")
   avatar    String?  @db.Text @map("Avatar")
 
-  ownedProjects  Project[]        @relation("ProjectOwner")
-  projectMembers ProjectMember[]
-  assignedTasks  Task[]           @relation("TaskAssignee")
-  assignedByMe   Task[]           @relation("TaskAssigner")
-  createdTasks   Task[]           @relation("TaskCreator")
-  attachments    TaskAttachment[]
-  comments       TaskComment[]
-  activities     TaskActivity[]
+  ownedProjects       Project[]              @relation("ProjectOwner")
+  projectMembers      ProjectMember[]
+  assignedTasks       Task[]                 @relation("TaskAssignee")
+  assignedByMe        Task[]                 @relation("TaskAssigner")
+  createdTasks        Task[]                 @relation("TaskCreator")
+  attachments         TaskAttachment[]
+  comments            TaskComment[]
+  activities          TaskActivity[]
+  requestedExtensions TaskExtensionRequest[] @relation("RequestedExtensions")
+  reviewedExtensions  TaskExtensionRequest[] @relation("ReviewedExtensions")
 
   @@map("Users")
 }
@@ -44,6 +46,7 @@ model Project {
   tasks   Task[]
   labels  Label[]
 
+  @@index([ownerId])
   @@map("Projects")
 }
 
@@ -57,6 +60,7 @@ model ProjectMember {
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([projectId, userId])
+  @@index([userId])
   @@map("ProjectMembers")
 }
 
@@ -74,15 +78,20 @@ model Task {
   orderIndex  Float     @default(0) @map("OrderIndex")
   createdAt   DateTime  @default(now()) @map("CreatedAt")
 
-  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  assignee    User?            @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
-  assigner    User?            @relation("TaskAssigner", fields: [assignerId], references: [id], onDelete: SetNull)
-  createdBy   User?            @relation("TaskCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  taskLabels  TaskLabel[]
-  attachments TaskAttachment[]
-  comments    TaskComment[]
-  activities  TaskActivity[]
+  project           Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee          User?                  @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  assigner          User?                  @relation("TaskAssigner", fields: [assignerId], references: [id], onDelete: SetNull)
+  createdBy         User?                  @relation("TaskCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  taskLabels        TaskLabel[]
+  attachments       TaskAttachment[]
+  comments          TaskComment[]
+  activities        TaskActivity[]
+  extensionRequests TaskExtensionRequest[]
 
+  @@index([projectId])
+  @@index([assigneeId])
+  @@index([assignerId])
+  @@index([createdById])
   @@map("Tasks")
 }
 model Label {
@@ -94,6 +103,7 @@ model Label {
   project    Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
   taskLabels TaskLabel[]
 
+  @@index([projectId])
   @@map("Labels")
 }
 
@@ -105,6 +115,7 @@ model TaskLabel {
   label Label @relation(fields: [labelId], references: [id], onDelete: Cascade)
 
   @@id([taskId, labelId])
+  @@index([labelId])
   @@map("TaskLabels")
 }
 
@@ -119,6 +130,8 @@ model TaskAttachment {
   task     Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
   uploader User @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
 
+  @@index([taskId])
+  @@index([uploaderId])
   @@map("TaskAttachments")
 }
 
@@ -132,6 +145,8 @@ model TaskComment {
   task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([taskId])
+  @@index([userId])
   @@map("TaskComments")
 }
 
@@ -145,5 +160,30 @@ model TaskActivity {
   task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([taskId])
+  @@index([userId])
   @@map("TaskActivities")
+}
+
+model TaskExtensionRequest {
+  id            Int       @id @default(autoincrement()) @map("Id")
+  taskId        Int       @map("TaskId")
+  requestedById Int       @map("RequestedById")
+  oldDueDate    DateTime? @map("OldDueDate")
+  newDueDate    DateTime  @map("NewDueDate")
+  reason        String    @db.Text @map("Reason")
+  status        Int       @default(0) @map("Status") // 0: PENDING, 1: APPROVED, 2: REJECTED
+  reviewedById  Int?      @map("ReviewedById")
+  reviewNote    String?   @db.Text @map("ReviewNote")
+  createdAt     DateTime  @default(now()) @map("CreatedAt")
+  reviewedAt    DateTime? @map("ReviewedAt")
+
+  task        Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  requestedBy User  @relation("RequestedExtensions", fields: [requestedById], references: [id], onDelete: Cascade)
+  reviewedBy  User? @relation("ReviewedExtensions", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([taskId])
+  @@index([requestedById])
+  @@index([reviewedById])
+  @@map("TaskExtensionRequests")
 }

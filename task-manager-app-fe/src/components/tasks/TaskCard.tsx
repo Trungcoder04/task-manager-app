@@ -41,6 +41,8 @@ export const TaskCard: React.FC<TaskCardProps> = ({
     task.status === TaskStatus.TODO &&
     (task.activities?.some((a) => a.action.toLowerCase().includes('làm lại')) || false);
 
+  const hasPendingExtension = task.extensionRequests?.some((e) => e.status === 0);
+
   return (
     <div
       className={`task-card ${isDragging ? 'is-dragging' : ''}`}
@@ -51,7 +53,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
       onClick={() => onSelect(task)}
     >
       <div className="task-card-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
           <Badge priority={task.priority} />
           {isReworked && (
             <span
@@ -70,6 +72,25 @@ export const TaskCard: React.FC<TaskCardProps> = ({
               title="Công việc này vừa được Admin yêu cầu làm lại"
             >
               ⚠️ Cần làm lại
+            </span>
+          )}
+          {hasPendingExtension && (
+            <span
+              style={{
+                fontSize: '0.625rem',
+                fontWeight: 800,
+                backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                color: '#b45309',
+                border: '1px solid rgba(245, 158, 11, 0.4)',
+                borderRadius: '4px',
+                padding: '0.05rem 0.35rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.2rem',
+              }}
+              title="Công việc đang có yêu cầu xin gia hạn deadline chờ duyệt"
+            >
+              ⏳ Xin gia hạn
             </span>
           )}
         </div>

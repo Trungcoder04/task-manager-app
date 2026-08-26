@@ -80,6 +80,8 @@ export const AppLayout: React.FC = () => {
     deleteAttachment,
     createLabel,
     deleteLabel,
+    requestExtension,
+    reviewExtension,
   } = useTasks(activeProject?.id, user?.id);
 
   const currentUserRole: ProjectMemberRoleType =
@@ -140,8 +142,10 @@ export const AppLayout: React.FC = () => {
                   }
                   projectId={activeProject.id}
                   members={projectMembers}
+                  projectMembers={activeProject.members || []}
                   labels={labels}
                   userRole={currentUserRole}
+                  currentUserId={user?.id}
                   onCreateTask={createTask}
                   onUpdateTask={updateTask}
                   onUpdateStatus={updateTaskStatus}
@@ -150,6 +154,8 @@ export const AppLayout: React.FC = () => {
                   onAddAttachment={addAttachment}
                   onUploadAttachment={uploadAttachment}
                   onDeleteAttachment={deleteAttachment}
+                  onRequestExtension={requestExtension}
+                  onReviewExtension={reviewExtension}
                 />
               )}
             </>
@@ -165,6 +171,7 @@ export const AppLayout: React.FC = () => {
               isLoading={isTasksLoading}
               error={tasksError}
               userRole={currentUserRole}
+              currentUserId={user?.id}
               onFilterChange={setFilters}
               onMoveTask={moveTaskStatus}
               onCreateTask={createTask}
@@ -177,6 +184,8 @@ export const AppLayout: React.FC = () => {
               onDeleteAttachment={deleteAttachment}
               onCreateLabel={createLabel}
               onDeleteLabel={deleteLabel}
+              onRequestExtension={requestExtension}
+              onReviewExtension={reviewExtension}
               onGoToProjects={() => setActiveTab('projects')}
               selectedTask={selectedTaskForDrawer}
               onClearSelectedTask={() => setSelectedTaskForDrawer(null)}
