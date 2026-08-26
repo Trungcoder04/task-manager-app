@@ -596,8 +596,8 @@ export const UsersPage: React.FC<UsersPageProps> = ({
           </div>
 
           {/* Chọn số dòng hiển thị mỗi trang */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <span>Hiển thị mỗi trang:</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexShrink: 0 }}>
+            <span style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>Hiển thị mỗi trang:</span>
             <select
               className="form-input"
               value={pageSize}
@@ -612,6 +612,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({
                 borderRadius: 'var(--radius-md)',
                 fontWeight: 600,
                 cursor: 'pointer',
+                flexShrink: 0,
               }}
             >
               <option value={5}>5 dòng</option>

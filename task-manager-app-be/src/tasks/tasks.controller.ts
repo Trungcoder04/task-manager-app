@@ -17,6 +17,8 @@ import { UpdateTaskDto } from './dto/update-task.dto';
 import { TaskQueryDto } from './dto/task-query.dto';
 import { TaskResponse } from './dto/task-response.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { CreateExtensionRequestDto } from './dto/create-extension-request.dto';
+import { ReviewExtensionRequestDto } from './dto/review-extension-request.dto';
 import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
 
 @Controller()
@@ -30,6 +32,27 @@ export class TasksController {
         @Body() dto: CreateTaskDto,
     ) {
         return this.tasksService.createTask(userId, dto);
+    }
+
+    // API xin gia hạn deadline
+    @Post('tasks/:id/extension-requests')
+    async createExtensionRequest(
+        @Param('id', ParseIntPipe) taskId: number,
+        @CurrentUser('userId') userId: number,
+        @Body() dto: CreateExtensionRequestDto,
+    ) {
+        return this.tasksService.requestExtension(userId, taskId, dto);
+    }
+
+    // API phe duyet xin gia han deadline (Chap thuan / Tu choi)
+    @Patch('tasks/:id/extension-requests/:extensionId')
+    async reviewExtensionRequest(
+        @Param('id', ParseIntPipe) taskId: number,
+        @Param('extensionId', ParseIntPipe) extensionId: number,
+        @CurrentUser('userId') userId: number,
+        @Body() dto: ReviewExtensionRequestDto,
+    ) {
+        return this.tasksService.reviewExtension(userId, taskId, extensionId, dto);
     }
 
     // API cap nhat trang thai task

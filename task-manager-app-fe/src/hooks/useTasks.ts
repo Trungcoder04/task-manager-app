@@ -297,6 +297,42 @@ export const useTasks = (projectId?: number, currentUserId?: number) => {
     }
   };
 
+  const requestExtension = async (taskId: number, newDueDate: string, reason: string) => {
+    try {
+      const updated = await taskService.requestExtension(taskId, newDueDate, reason);
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? { ...t, ...updated } : t)),
+      );
+      showToast('Đã gửi yêu cầu xin gia hạn deadline!', 'success');
+      return updated;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Gửi yêu cầu gia hạn thất bại';
+      showToast(msg, 'error');
+      throw err;
+    }
+  };
+
+  const reviewExtension = async (
+    taskId: number,
+    extensionId: number,
+    status: number,
+    reviewNote?: string,
+  ) => {
+    try {
+      const updated = await taskService.reviewExtension(taskId, extensionId, status, reviewNote);
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? { ...t, ...updated } : t)),
+      );
+      const actionName = status === 1 ? 'Đã chấp thuận gia hạn deadline!' : 'Đã từ chối gia hạn deadline!';
+      showToast(actionName, status === 1 ? 'success' : 'info');
+      return updated;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Xử lý yêu cầu gia hạn thất bại';
+      showToast(msg, 'error');
+      throw err;
+    }
+  };
+
   return {
     tasks,
     filteredTasks,
@@ -317,5 +353,7 @@ export const useTasks = (projectId?: number, currentUserId?: number) => {
     deleteAttachment,
     createLabel,
     deleteLabel,
+    requestExtension,
+    reviewExtension,
   };
 };

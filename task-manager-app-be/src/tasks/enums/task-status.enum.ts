@@ -18,5 +18,6 @@ export const TaskStatusName: Record<number, string> = {
 
 export enum ProjectRole {
   ADMIN = 1,
-  MEMBER = 2,
+  LEAD = 2,
+  MEMBER = 3,
 }

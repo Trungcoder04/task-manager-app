@@ -2,8 +2,10 @@
 .board-page {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   gap: 0.75rem;
+  overflow: hidden;
 }
 
 /* Toolbar & Filters - Compact & Sleek */

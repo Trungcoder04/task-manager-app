@@ -52,11 +52,28 @@ export interface Task {
   comments?: TaskComment[];
   attachments?: TaskAttachment[];
   activities?: TaskActivity[];
+  extensionRequests?: TaskExtensionRequest[];
   _count?: {
     comments?: number;
     attachments?: number;
     activities?: number;
   };
+}
+
+export interface TaskExtensionRequest {
+  id: number;
+  taskId: number;
+  requestedById: number;
+  oldDueDate?: string;
+  newDueDate: string;
+  reason: string;
+  status: number; // 0: PENDING, 1: APPROVED, 2: REJECTED
+  reviewedById?: number;
+  reviewNote?: string;
+  createdAt: string;
+  reviewedAt?: string;
+  requestedBy?: User;
+  reviewedBy?: User;
 }
 
 export interface CreateTaskRequest {

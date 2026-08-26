@@ -470,6 +470,51 @@ class TaskService {
     }
     return null;
   }
+
+  async requestExtension(taskId: number, newDueDate: string, reason: string): Promise<Task> {
+    try {
+      const response = await apiClient.post<unknown, ApiResponse<Task>>(
+        `/tasks/${taskId}/extension-requests`,
+        { newDueDate, reason },
+      );
+      if (response && response.result) {
+        return response.result;
+      }
+      if (response && (response as unknown as Task).id) {
+        return response as unknown as Task;
+      }
+    } catch (err) {
+      if (err instanceof Error) {
+        throw err;
+      }
+    }
+    return this.getTask(taskId);
+  }
+
+  async reviewExtension(
+    taskId: number,
+    extensionId: number,
+    status: number,
+    reviewNote?: string,
+  ): Promise<Task> {
+    try {
+      const response = await apiClient.patch<unknown, ApiResponse<Task>>(
+        `/tasks/${taskId}/extension-requests/${extensionId}`,
+        { status, reviewNote },
+      );
+      if (response && response.result) {
+        return response.result;
+      }
+      if (response && (response as unknown as Task).id) {
+        return response as unknown as Task;
+      }
+    } catch (err) {
+      if (err instanceof Error) {
+        throw err;
+      }
+    }
+    return this.getTask(taskId);
+  }
 }
 
 export const taskService = new TaskService();
