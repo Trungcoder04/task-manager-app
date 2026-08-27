@@ -432,8 +432,8 @@ export const TaskList: React.FC<TaskListProps> = ({
                           )}
                         </div>
                         {task.labels && task.labels.length > 0 && (
-                          <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-                            {task.labels.map((lbl) => (
+                          <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                            {task.labels.slice(0, 3).map((lbl) => (
                               <span
                                 key={lbl.id}
                                 style={{
@@ -443,11 +443,30 @@ export const TaskList: React.FC<TaskListProps> = ({
                                   fontWeight: 700,
                                   padding: '0.15rem 0.5rem',
                                   borderRadius: 'var(--radius-sm)',
+                                  whiteSpace: 'nowrap',
                                 }}
                               >
                                 {lbl.name}
                               </span>
                             ))}
+                            {task.labels.length > 3 && (
+                              <span
+                                style={{
+                                  backgroundColor: 'var(--bg-surface-secondary)',
+                                  color: 'var(--text-muted)',
+                                  fontSize: '0.65rem',
+                                  fontWeight: 700,
+                                  padding: '0.12rem 0.4rem',
+                                  borderRadius: 'var(--radius-sm)',
+                                  border: '1px solid var(--border-color)',
+                                  whiteSpace: 'nowrap',
+                                  cursor: 'default',
+                                }}
+                                title={`Còn ${task.labels.length - 3} nhãn khác: ${task.labels.slice(3).map((l) => l.name).join(', ')}`}
+                              >
+                                +{task.labels.length - 3}
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>

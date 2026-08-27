@@ -143,6 +143,8 @@
   letter-spacing: 0.025em;
   border-radius: var(--radius-sm);
   text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .badge-priority-high {

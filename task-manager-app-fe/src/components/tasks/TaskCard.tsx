@@ -96,7 +96,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
         </div>
         {task.labels && task.labels.length > 0 && (
           <div className="task-labels-wrap">
-            {task.labels.map((lbl) => (
+            {task.labels.slice(0, 2).map((lbl) => (
               <span
                 key={lbl.id}
                 className="label-chip"
@@ -104,11 +104,29 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                   backgroundColor: `${lbl.colorCode || '#6366f1'}1f`,
                   color: lbl.colorCode || '#6366f1',
                   border: `1px solid ${lbl.colorCode || '#6366f1'}4d`,
+                  whiteSpace: 'nowrap',
                 }}
               >
                 {lbl.name}
               </span>
             ))}
+            {task.labels.length > 2 && (
+              <span
+                className="label-chip"
+                style={{
+                  backgroundColor: 'var(--bg-surface-secondary)',
+                  color: 'var(--text-muted)',
+                  border: '1px solid var(--border-color)',
+                  fontWeight: 700,
+                  fontSize: '0.625rem',
+                  whiteSpace: 'nowrap',
+                  cursor: 'default',
+                }}
+                title={`Còn ${task.labels.length - 2} nhãn khác: ${task.labels.slice(2).map((l) => l.name).join(', ')}`}
+              >
+                +{task.labels.length - 2}
+              </span>
+            )}
           </div>
         )}
       </div>
