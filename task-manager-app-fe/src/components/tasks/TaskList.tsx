@@ -31,8 +31,10 @@ export const TaskList: React.FC<TaskListProps> = ({
   // 🔘 State Checkbox chọn task
   const [selectedTaskIds, setSelectedTaskIds] = useState<number[]>([]);
 
-  // ⏰ State Modal Xin gia hạn
+  // ⏰ State Modal Không gian xin gia hạn (Extension Queue Workspace)
   const [isExtensionModalOpen, setIsExtensionModalOpen] = useState(false);
+  const [activeEditingTask, setActiveEditingTask] = useState<Task | null>(null);
+  const [submittedTaskIds, setSubmittedTaskIds] = useState<Record<number, { newDueDate: string; reason: string }>>({});
   const [extensionNewDueDate, setExtensionNewDueDate] = useState('');
   const [extensionReason, setExtensionReason] = useState('');
   const [extensionError, setExtensionError] = useState('');
@@ -117,12 +119,49 @@ export const TaskList: React.FC<TaskListProps> = ({
     }
   };
 
-  // Gửi yêu cầu xin gia hạn hàng loạt
-  const handleSubmitBulkExtension = async () => {
+  // Mở modal Xin gia hạn
+  const handleOpenExtensionModal = () => {
+    if (eligibleSelectedTasks.length === 0) return;
+    setExtensionError('');
+    setExtensionNewDueDate('');
+    setExtensionReason('');
+    setSubmittedTaskIds({});
+    
+    // Nếu chỉ có đúng 1 task -> mở trực tiếp form của task đó
+    if (eligibleSelectedTasks.length === 1) {
+      setActiveEditingTask(eligibleSelectedTasks[0]);
+    } else {
+      // Nếu có nhiều task -> mở danh sách workspace để chọn từng việc
+      setActiveEditingTask(null);
+    }
+    setIsExtensionModalOpen(true);
+  };
+
+  // Mở form nhập gia hạn cho 1 task cụ thể trong danh sách
+  const handleSelectTaskToExtend = (task: Task) => {
+    setActiveEditingTask(task);
+    setExtensionNewDueDate('');
+    setExtensionReason('');
+    setExtensionError('');
+  };
+
+  // Gửi yêu cầu gia hạn cho task đang chọn
+  const handleSubmitTaskExtension = async () => {
+    if (!activeEditingTask) return;
     if (!extensionNewDueDate) {
       setExtensionError('Vui lòng chọn hạn chót đề xuất mới');
       return;
     }
+
+    if (activeEditingTask.dueDate) {
+      const oldTime = new Date(activeEditingTask.dueDate).setHours(0, 0, 0, 0);
+      const newTime = new Date(extensionNewDueDate).setHours(0, 0, 0, 0);
+      if (newTime <= oldTime) {
+        setExtensionError('Hạn chót mới phải sau hạn chót hiện tại của công việc');
+        return;
+      }
+    }
+
     if (!extensionReason.trim()) {
       setExtensionError('Vui lòng nhập lý do xin gia hạn');
       return;
@@ -133,17 +172,38 @@ export const TaskList: React.FC<TaskListProps> = ({
     setIsSubmittingExtension(true);
     setExtensionError('');
     try {
-      await Promise.all(
-        eligibleSelectedTasks.map((t) =>
-          onRequestExtension(t.id, extensionNewDueDate, extensionReason.trim())
-        )
-      );
-      setIsExtensionModalOpen(false);
-      setSelectedTaskIds([]);
+      await onRequestExtension(activeEditingTask.id, extensionNewDueDate, extensionReason.trim());
+      
+      // Ghi nhận task này đã gửi thành công
+      setSubmittedTaskIds((prev) => ({
+        ...prev,
+        [activeEditingTask.id]: { newDueDate: extensionNewDueDate, reason: extensionReason.trim() },
+      }));
+
+      // Nếu chỉ có 1 task -> đóng modal luôn
+      if (eligibleSelectedTasks.length === 1) {
+        setIsExtensionModalOpen(false);
+        setSelectedTaskIds((prev) => prev.filter((id) => id !== activeEditingTask.id));
+        setActiveEditingTask(null);
+      } else {
+        // Nếu có nhiều task -> quay lại danh sách để người dùng chọn tiếp các việc còn lại
+        setActiveEditingTask(null);
+      }
     } catch (err: any) {
       setExtensionError(err?.message || 'Không thể gửi yêu cầu gia hạn. Vui lòng thử lại.');
     } finally {
       setIsSubmittingExtension(false);
+    }
+  };
+
+  // Đóng modal hoàn tất
+  const handleCloseExtensionModal = () => {
+    setIsExtensionModalOpen(false);
+    setActiveEditingTask(null);
+    // Bỏ chọn các task đã gửi thành công
+    const submittedIds = Object.keys(submittedTaskIds).map(Number);
+    if (submittedIds.length > 0) {
+      setSelectedTaskIds((prev) => prev.filter((id) => !submittedIds.includes(id)));
     }
   };
 
@@ -207,12 +267,7 @@ export const TaskList: React.FC<TaskListProps> = ({
             {eligibleSelectedTasks.length > 0 && onRequestExtension && (
               <button
                 type="button"
-                onClick={() => {
-                  setExtensionNewDueDate('');
-                  setExtensionReason('');
-                  setExtensionError('');
-                  setIsExtensionModalOpen(true);
-                }}
+                onClick={handleOpenExtensionModal}
                 style={{
                   backgroundColor: '#d97706',
                   color: '#ffffff',
@@ -584,146 +639,298 @@ export const TaskList: React.FC<TaskListProps> = ({
         </div>
       </div>
 
-      {/* ⏰ Modal Xin gia hạn deadline hàng loạt */}
+      {/* ⏰ Modal Không gian xin gia hạn deadline (Extension Queue Workspace) */}
       {isExtensionModalOpen && (
         <div className="modal-backdrop" style={{ zIndex: 1050 }}>
           <div
             className="modal-content"
             style={{
-              maxWidth: '500px',
-              width: '92%',
+              maxWidth: activeEditingTask ? '520px' : '620px',
+              width: '94%',
               padding: '1.5rem',
               borderRadius: 'var(--radius-xl)',
               backgroundColor: 'var(--bg-surface)',
-              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '1rem',
+              gap: '1.1rem',
               animation: 'fadeIn 0.2s ease-in-out',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#b45309' }}>
-                <Icon name="clock" size={20} />
-                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>
-                  Xin gia hạn deadline ({eligibleSelectedTasks.length} việc)
-                </h3>
-              </div>
-              <button
-                type="button"
-                className="btn btn-ghost btn-icon"
-                onClick={() => setIsExtensionModalOpen(false)}
-                disabled={isSubmittingExtension}
-              >
-                <Icon name="x" size={18} />
-              </button>
-            </div>
-
-            {/* Danh sách các task được xin gia hạn */}
-            <div>
-              <label className="form-label" style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
-                Danh sách công việc áp dụng:
-              </label>
-              <div
-                style={{
-                  maxHeight: '120px',
-                  overflowY: 'auto',
-                  backgroundColor: 'var(--bg-surface-secondary)',
-                  padding: '0.65rem 0.85rem',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--border-color)',
-                  fontSize: '0.8125rem',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.4rem',
-                }}
-              >
-                {eligibleSelectedTasks.map((t) => (
-                  <div key={t.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-                    <span style={{ fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      • {t.title}
-                    </span>
-                    <span style={{ fontSize: '0.725rem', color: 'var(--text-muted)', flexShrink: 0 }}>
-                      Hạn: {formatDate(t.dueDate)}
-                    </span>
+            {/* VIEW 1: Danh sách các công việc đủ điều kiện gia hạn (Queue List View) */}
+            {!activeEditingTask ? (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: '#b45309' }}>
+                    <Icon name="clock" size={22} />
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        Danh sách xin gia hạn deadline
+                      </h3>
+                      <p style={{ margin: '0.15rem 0 0 0', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                        Đã gửi yêu cầu: <strong style={{ color: '#059669' }}>{Object.keys(submittedTaskIds).length}</strong> / {eligibleSelectedTasks.length} công việc
+                      </p>
+                    </div>
                   </div>
-                ))}
-              </div>
-            </div>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-icon"
+                    onClick={handleCloseExtensionModal}
+                  >
+                    <Icon name="x" size={18} />
+                  </button>
+                </div>
 
-            {extensionError && (
-              <div
-                style={{
-                  color: 'var(--priority-high)',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  padding: '0.5rem 0.75rem',
-                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                  borderRadius: 'var(--radius-md)',
-                }}
-              >
-                {extensionError}
-              </div>
+                <div
+                  style={{
+                    maxHeight: '360px',
+                    overflowY: 'auto',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.65rem',
+                    paddingRight: '0.25rem',
+                  }}
+                >
+                  {eligibleSelectedTasks.map((task) => {
+                    const isSubmitted = !!submittedTaskIds[task.id];
+                    const priorityInfo = getPriorityBadge(task.priority);
+
+                    return (
+                      <div
+                        key={task.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '0.75rem',
+                          padding: '0.85rem 1rem',
+                          backgroundColor: isSubmitted ? 'rgba(16, 185, 129, 0.06)' : 'var(--bg-surface-secondary)',
+                          borderRadius: 'var(--radius-lg)',
+                          border: `1px solid ${isSubmitted ? 'rgba(16, 185, 129, 0.3)' : 'var(--border-color)'}`,
+                          transition: 'all var(--transition-fast)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                              {task.title}
+                            </span>
+                            <span
+                              style={{
+                                backgroundColor: priorityInfo.bg,
+                                color: priorityInfo.color,
+                                fontSize: '0.7rem',
+                                fontWeight: 700,
+                                padding: '0.1rem 0.45rem',
+                                borderRadius: '999px',
+                              }}
+                            >
+                              {priorityInfo.label}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <Icon name="clock" size={13} />
+                            <span>Hạn hiện tại: <strong>{formatDate(task.dueDate)}</strong></span>
+                          </div>
+                        </div>
+
+                        {/* Cột thao tác */}
+                        <div>
+                          {isSubmitted ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.2rem' }}>
+                              <span
+                                style={{
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  color: '#059669',
+                                  backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                                  padding: '0.25rem 0.6rem',
+                                  borderRadius: '999px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.25rem',
+                                }}
+                              >
+                                ✅ Đã gửi yêu cầu
+                              </span>
+                              <span style={{ fontSize: '0.7rem', color: '#059669', fontWeight: 600 }}>
+                                Hạn mới: {formatDate(submittedTaskIds[task.id].newDueDate)}
+                              </span>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleSelectTaskToExtend(task)}
+                              style={{
+                                backgroundColor: '#d97706',
+                                color: '#ffffff',
+                                border: 'none',
+                                borderRadius: 'var(--radius-md)',
+                                padding: '0.4rem 0.85rem',
+                                fontSize: '0.8rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.35rem',
+                                boxShadow: '0 2px 6px rgba(217, 119, 6, 0.25)',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              <Icon name="clock" size={13} color="#ffffff" />
+                              <span>Gia hạn việc này</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Footer Modal Danh sách */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.5rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)' }}>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                    Bấm "Gia hạn việc này" để tùy chỉnh ngày và lý do cho từng việc.
+                  </span>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handleCloseExtensionModal}
+                    style={{ minWidth: '100px' }}
+                  >
+                    Hoàn tất
+                  </Button>
+                </div>
+              </>
+            ) : (
+              /* VIEW 2: Form nhập hạn chót và lý do cho 1 task cụ thể (Form View) */
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    {eligibleSelectedTasks.length > 1 && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => setActiveEditingTask(null)}
+                        disabled={isSubmittingExtension}
+                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                      >
+                        <Icon name="chevron-left" size={16} />
+                        <span>Quay lại</span>
+                      </button>
+                    )}
+                    <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                      Xin gia hạn: <span style={{ color: '#d97706' }}>{activeEditingTask.title}</span>
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-icon"
+                    onClick={handleCloseExtensionModal}
+                    disabled={isSubmittingExtension}
+                  >
+                    <Icon name="x" size={18} />
+                  </button>
+                </div>
+
+                {/* Thông tin task hiện tại */}
+                <div
+                  style={{
+                    backgroundColor: 'var(--bg-surface-secondary)',
+                    padding: '0.65rem 0.85rem',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border-color)',
+                    fontSize: '0.8125rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <span style={{ color: 'var(--text-secondary)' }}>Hạn hoàn thành hiện tại:</span>
+                  <strong style={{ color: 'var(--text-primary)' }}>{formatDate(activeEditingTask.dueDate)}</strong>
+                </div>
+
+                {extensionError && (
+                  <div
+                    style={{
+                      color: 'var(--priority-high)',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      padding: '0.5rem 0.75rem',
+                      backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                      borderRadius: 'var(--radius-md)',
+                    }}
+                  >
+                    {extensionError}
+                  </div>
+                )}
+
+                {/* Form inputs */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label" style={{ fontSize: '0.8125rem', fontWeight: 600, marginBottom: '0.25rem' }}>
+                      Hạn chót đề xuất mới <span style={{ color: 'var(--priority-high)' }}>*</span>
+                    </label>
+                    <input
+                      type="date"
+                      className="form-input"
+                      value={extensionNewDueDate}
+                      onChange={(e) => {
+                        setExtensionNewDueDate(e.target.value);
+                        if (extensionError) setExtensionError('');
+                      }}
+                      disabled={isSubmittingExtension}
+                      style={{ fontSize: '0.85rem' }}
+                    />
+                  </div>
+
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label" style={{ fontSize: '0.8125rem', fontWeight: 600, marginBottom: '0.25rem' }}>
+                      Lý do xin gia hạn <span style={{ color: 'var(--priority-high)' }}>*</span>
+                    </label>
+                    <textarea
+                      className="form-input"
+                      rows={3}
+                      placeholder="Nêu rõ lý do cần thêm thời gian cho công việc này..."
+                      value={extensionReason}
+                      onChange={(e) => {
+                        setExtensionReason(e.target.value);
+                        if (extensionError) setExtensionError('');
+                      }}
+                      disabled={isSubmittingExtension}
+                      style={{ fontSize: '0.85rem', resize: 'vertical' }}
+                    />
+                  </div>
+                </div>
+
+                {/* Modal Footer actions */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      if (eligibleSelectedTasks.length > 1) {
+                        setActiveEditingTask(null);
+                      } else {
+                        handleCloseExtensionModal();
+                      }
+                    }}
+                    disabled={isSubmittingExtension}
+                  >
+                    {eligibleSelectedTasks.length > 1 ? 'Quay lại' : 'Hủy bỏ'}
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    isLoading={isSubmittingExtension}
+                    onClick={handleSubmitTaskExtension}
+                    style={{ backgroundColor: '#d97706', borderColor: '#d97706' }}
+                  >
+                    Gửi yêu cầu gia hạn
+                  </Button>
+                </div>
+              </>
             )}
-
-            {/* Form inputs */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label" style={{ fontSize: '0.8125rem', fontWeight: 600, marginBottom: '0.25rem' }}>
-                  Hạn chót đề xuất mới <span style={{ color: 'var(--priority-high)' }}>*</span>
-                </label>
-                <input
-                  type="date"
-                  className="form-input"
-                  value={extensionNewDueDate}
-                  onChange={(e) => {
-                    setExtensionNewDueDate(e.target.value);
-                    if (extensionError) setExtensionError('');
-                  }}
-                  disabled={isSubmittingExtension}
-                  style={{ fontSize: '0.85rem' }}
-                />
-              </div>
-
-              <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label" style={{ fontSize: '0.8125rem', fontWeight: 600, marginBottom: '0.25rem' }}>
-                  Lý do xin gia hạn <span style={{ color: 'var(--priority-high)' }}>*</span>
-                </label>
-                <textarea
-                  className="form-input"
-                  rows={3}
-                  placeholder="Nêu rõ lý do cần thêm thời gian (khối lượng phát sinh, trở ngại kỹ thuật...)"
-                  value={extensionReason}
-                  onChange={(e) => {
-                    setExtensionReason(e.target.value);
-                    if (extensionError) setExtensionError('');
-                  }}
-                  disabled={isSubmittingExtension}
-                  style={{ fontSize: '0.85rem', resize: 'vertical' }}
-                />
-              </div>
-            </div>
-
-            {/* Modal Footer actions */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setIsExtensionModalOpen(false)}
-                disabled={isSubmittingExtension}
-              >
-                Hủy bỏ
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                isLoading={isSubmittingExtension}
-                onClick={handleSubmitBulkExtension}
-                style={{ backgroundColor: '#d97706', borderColor: '#d97706' }}
-              >
-                Gửi yêu cầu gia hạn
-              </Button>
-            </div>
           </div>
         </div>
       )}
@@ -744,4 +951,5 @@ export const TaskList: React.FC<TaskListProps> = ({
     </div>
   );
 };
+
 
