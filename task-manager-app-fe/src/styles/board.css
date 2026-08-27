@@ -232,3 +232,45 @@
   color: var(--priority-high);
   font-weight: 700;
 }
+
+/* Responsive Toolbar & Filters */
+@media (max-width: 1024px) {
+  .board-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.65rem;
+    padding: 0.6rem 0.75rem;
+  }
+
+  .filter-bar {
+    width: 100%;
+    gap: 0.5rem;
+  }
+
+  .search-input-wrapper {
+    flex: 1 1 180px;
+    width: auto;
+  }
+
+  .filter-bar .form-select {
+    flex: 1 1 auto;
+    min-width: 130px;
+  }
+}
+
+@media (max-width: 640px) {
+  .board-toolbar {
+    padding: 0.5rem;
+    gap: 0.5rem;
+  }
+
+  .search-input-wrapper {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+
+  .filter-bar .form-select {
+    width: 100% !important;
+  }
+}
+

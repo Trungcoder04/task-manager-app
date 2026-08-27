@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sidebar, TabType } from './Sidebar';
 import { Header } from './Header';
 import { Toast } from '../common/Toast';
@@ -94,6 +94,18 @@ export const AppLayout: React.FC = () => {
   const projectMembers = (activeProject?.members || [])
     .map((m) => m.user!)
     .filter(Boolean);
+
+  // Tự động reset bộ lọc công việc về trạng thái ban đầu mỗi khi chuyển tab
+  useEffect(() => {
+    setFilters({
+      search: '',
+      status: 'ALL',
+      priority: 'ALL',
+      assigneeId: 'ALL',
+      assignerId: 'ALL',
+      labelId: 'ALL',
+    });
+  }, [activeTab, setFilters]);
 
   const handleSelectTaskFromDashboard = (task: Task) => {
     setSelectedTaskForDrawer(task);

@@ -55,6 +55,17 @@ export const useTasks = (projectId?: number, currentUserId?: number) => {
     void fetchData();
   }, [fetchData]);
 
+  useEffect(() => {
+    setFilters({
+      search: '',
+      status: 'ALL',
+      priority: 'ALL',
+      assigneeId: 'ALL',
+      assignerId: 'ALL',
+      labelId: 'ALL',
+    });
+  }, [projectId]);
+
   // Filtered tasks logic
   const filteredTasks = useMemo(() => {
     return tasks.filter((task) => {
