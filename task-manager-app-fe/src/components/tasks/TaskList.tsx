@@ -7,22 +7,36 @@ import { ConfirmModal } from '../common/ConfirmModal';
 
 interface TaskListProps {
   tasks: Task[];
+  currentUserId?: number;
   onSelectTask: (task: Task) => void;
   onMoveTask: (taskId: number, newStatus: TaskStatusType) => void;
   onDeleteTask: (taskId: number) => Promise<void>;
+  onRequestExtension?: (taskId: number, newDueDate: string, reason: string) => Promise<any>;
 }
 
 export const TaskList: React.FC<TaskListProps> = ({
   tasks,
+  currentUserId,
   onSelectTask,
   onMoveTask,
   onDeleteTask,
+  onRequestExtension,
 }) => {
   const [deletingTask, setDeletingTask] = useState<Task | null>(null);
 
   // 📄 State phân trang
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
+
+  // 🔘 State Checkbox chọn task
+  const [selectedTaskIds, setSelectedTaskIds] = useState<number[]>([]);
+
+  // ⏰ State Modal Xin gia hạn
+  const [isExtensionModalOpen, setIsExtensionModalOpen] = useState(false);
+  const [extensionNewDueDate, setExtensionNewDueDate] = useState('');
+  const [extensionReason, setExtensionReason] = useState('');
+  const [extensionError, setExtensionError] = useState('');
+  const [isSubmittingExtension, setIsSubmittingExtension] = useState(false);
 
   // Tự động điều chỉnh trang nếu số lượng task thay đổi
   const totalPages = Math.ceil(tasks.length / pageSize) || 1;
@@ -67,6 +81,72 @@ export const TaskList: React.FC<TaskListProps> = ({
     }
   };
 
+  // Helper check xem task có đủ điều kiện xin gia hạn không:
+  // 1. Phải là Người thực hiện (Assignee === currentUserId)
+  // 2. Task chưa Hoàn thành (status !== 4)
+  // 3. Task chưa có yêu cầu gia hạn nào đang chờ duyệt (status === 0)
+  const isEligibleForExtension = (task: Task) => {
+    const hasPending = task.extensionRequests?.some((e) => e.status === 0);
+    const isAssignee = !!(task.assigneeId && currentUserId && task.assigneeId === currentUserId);
+    return isAssignee && task.status !== 4 && !hasPending;
+  };
+
+  // Danh sách các task được chọn đủ điều kiện xin gia hạn
+  const eligibleSelectedTasks = useMemo(() => {
+    return tasks.filter((t) => selectedTaskIds.includes(t.id) && isEligibleForExtension(t));
+  }, [tasks, selectedTaskIds, currentUserId]);
+
+  // Xử lý chọn / bỏ chọn từng task
+  const handleToggleSelect = (taskId: number) => {
+    setSelectedTaskIds((prev) =>
+      prev.includes(taskId) ? prev.filter((id) => id !== taskId) : [...prev, taskId]
+    );
+  };
+
+  // Xử lý chọn / bỏ chọn tất cả trên trang hiện tại
+  const isAllPaginatedSelected =
+    paginatedTasks.length > 0 && paginatedTasks.every((t) => selectedTaskIds.includes(t.id));
+
+  const handleToggleSelectAllPaginated = () => {
+    if (isAllPaginatedSelected) {
+      const paginatedIds = paginatedTasks.map((t) => t.id);
+      setSelectedTaskIds((prev) => prev.filter((id) => !paginatedIds.includes(id)));
+    } else {
+      const paginatedIds = paginatedTasks.map((t) => t.id);
+      setSelectedTaskIds((prev) => Array.from(new Set([...prev, ...paginatedIds])));
+    }
+  };
+
+  // Gửi yêu cầu xin gia hạn hàng loạt
+  const handleSubmitBulkExtension = async () => {
+    if (!extensionNewDueDate) {
+      setExtensionError('Vui lòng chọn hạn chót đề xuất mới');
+      return;
+    }
+    if (!extensionReason.trim()) {
+      setExtensionError('Vui lòng nhập lý do xin gia hạn');
+      return;
+    }
+
+    if (!onRequestExtension) return;
+
+    setIsSubmittingExtension(true);
+    setExtensionError('');
+    try {
+      await Promise.all(
+        eligibleSelectedTasks.map((t) =>
+          onRequestExtension(t.id, extensionNewDueDate, extensionReason.trim())
+        )
+      );
+      setIsExtensionModalOpen(false);
+      setSelectedTaskIds([]);
+    } catch (err: any) {
+      setExtensionError(err?.message || 'Không thể gửi yêu cầu gia hạn. Vui lòng thử lại.');
+    } finally {
+      setIsSubmittingExtension(false);
+    }
+  };
+
   return (
     <div
       style={{
@@ -82,6 +162,90 @@ export const TaskList: React.FC<TaskListProps> = ({
         minHeight: 0,
       }}
     >
+      {/* 🔘 Thanh thao tác hàng loạt khi có checkbox được chọn */}
+      {selectedTaskIds.length > 0 && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '0.75rem',
+            padding: '0.65rem 1.25rem',
+            backgroundColor: 'rgba(99, 102, 241, 0.08)',
+            borderBottom: '1px solid rgba(99, 102, 241, 0.2)',
+            animation: 'fadeIn 0.2s ease-in-out',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', fontSize: '0.85rem' }}>
+            <Icon name="check" size={16} color="var(--primary-600)" />
+            <span>
+              Đã chọn <strong style={{ color: 'var(--primary-600)' }}>{selectedTaskIds.length}</strong> công việc
+            </span>
+            {eligibleSelectedTasks.length > 0 ? (
+              <span
+                style={{
+                  fontSize: '0.75rem',
+                  color: '#b45309',
+                  fontWeight: 700,
+                  backgroundColor: 'rgba(245, 158, 11, 0.18)',
+                  padding: '0.15rem 0.55rem',
+                  borderRadius: '999px',
+                  border: '1px solid rgba(245, 158, 11, 0.3)',
+                }}
+              >
+                {eligibleSelectedTasks.length} việc đủ điều kiện xin gia hạn
+              </span>
+            ) : (
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                (Không có công việc nào do bạn thực hiện đủ điều kiện xin gia hạn)
+              </span>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            {eligibleSelectedTasks.length > 0 && onRequestExtension && (
+              <button
+                type="button"
+                onClick={() => {
+                  setExtensionNewDueDate('');
+                  setExtensionReason('');
+                  setExtensionError('');
+                  setIsExtensionModalOpen(true);
+                }}
+                style={{
+                  backgroundColor: '#d97706',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '0.4rem 0.85rem',
+                  fontSize: '0.8125rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  boxShadow: '0 2px 6px rgba(217, 119, 6, 0.3)',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <Icon name="clock" size={14} color="#ffffff" />
+                <span>Xin gia hạn ({eligibleSelectedTasks.length})</span>
+              </button>
+            )}
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedTaskIds([])}
+              style={{ fontSize: '0.8rem' }}
+            >
+              Bỏ chọn
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* 🔄 Khu vực cuộn riêng cho Bảng dữ liệu (Không cuộn cả trang) */}
       <div
         style={{
@@ -109,6 +273,21 @@ export const TaskList: React.FC<TaskListProps> = ({
                 letterSpacing: '0.06em',
               }}
             >
+              {/* Checkbox Header (Chọn tất cả trên trang) */}
+              <th style={{ width: '48px', padding: '1.1rem 0.75rem 1.1rem 1.25rem', textAlign: 'center' }}>
+                <input
+                  type="checkbox"
+                  checked={isAllPaginatedSelected}
+                  onChange={handleToggleSelectAllPaginated}
+                  style={{
+                    cursor: 'pointer',
+                    width: '16px',
+                    height: '16px',
+                    accentColor: 'var(--primary-600)',
+                  }}
+                  title="Chọn tất cả trên trang này"
+                />
+              </th>
               <th style={{ padding: '1.1rem 1.25rem', fontWeight: 700 }}>Công việc</th>
               <th style={{ padding: '1.1rem 1.25rem', fontWeight: 700 }}>Trạng thái</th>
               <th style={{ padding: '1.1rem 1.25rem', fontWeight: 700 }}>Độ ưu tiên</th>
@@ -121,7 +300,7 @@ export const TaskList: React.FC<TaskListProps> = ({
           <tbody>
             {paginatedTasks.length === 0 ? (
               <tr>
-                <td colSpan={7} style={{ padding: '4rem 2rem', textAlign: 'center' }}>
+                <td colSpan={8} style={{ padding: '4rem 2rem', textAlign: 'center' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', color: 'var(--text-muted)' }}>
                     <Icon name="search" size={40} />
                     <p style={{ fontSize: '1rem', fontWeight: 600, margin: 0 }}>Không tìm thấy công việc phù hợp</p>
@@ -133,17 +312,43 @@ export const TaskList: React.FC<TaskListProps> = ({
                 const priorityInfo = getPriorityBadge(task.priority);
                 const overdue = isOverdue(task.dueDate, task.status);
                 const hasPendingExtension = task.extensionRequests?.some((e) => e.status === 0);
+                const eligible = isEligibleForExtension(task);
+                const isChecked = selectedTaskIds.includes(task.id);
 
                 return (
                   <tr
                     key={task.id}
                     style={{
                       borderBottom: '1px solid var(--border-color)',
+                      backgroundColor: isChecked ? 'rgba(99, 102, 241, 0.04)' : 'transparent',
                       transition: 'all var(--transition-fast)',
                     }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(99, 102, 241, 0.03)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    onMouseEnter={(e) => {
+                      if (!isChecked) e.currentTarget.style.backgroundColor = 'rgba(99, 102, 241, 0.03)';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isChecked) e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
                   >
+                    {/* Cột Checkbox */}
+                    <td
+                      style={{ width: '48px', padding: '1.1rem 0.75rem 1.1rem 1.25rem', textAlign: 'center' }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => handleToggleSelect(task.id)}
+                        style={{
+                          cursor: 'pointer',
+                          width: '16px',
+                          height: '16px',
+                          accentColor: 'var(--primary-600)',
+                        }}
+                        title={eligible ? 'Tích chọn để xin gia hạn' : undefined}
+                      />
+                    </td>
+
                     {/* Cột 1: Tên công việc & Labels */}
                     <td style={{ padding: '1.1rem 1.25rem', cursor: 'pointer' }} onClick={() => onSelectTask(task)}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
@@ -379,6 +584,150 @@ export const TaskList: React.FC<TaskListProps> = ({
         </div>
       </div>
 
+      {/* ⏰ Modal Xin gia hạn deadline hàng loạt */}
+      {isExtensionModalOpen && (
+        <div className="modal-backdrop" style={{ zIndex: 1050 }}>
+          <div
+            className="modal-content"
+            style={{
+              maxWidth: '500px',
+              width: '92%',
+              padding: '1.5rem',
+              borderRadius: 'var(--radius-xl)',
+              backgroundColor: 'var(--bg-surface)',
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem',
+              animation: 'fadeIn 0.2s ease-in-out',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#b45309' }}>
+                <Icon name="clock" size={20} />
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700 }}>
+                  Xin gia hạn deadline ({eligibleSelectedTasks.length} việc)
+                </h3>
+              </div>
+              <button
+                type="button"
+                className="btn btn-ghost btn-icon"
+                onClick={() => setIsExtensionModalOpen(false)}
+                disabled={isSubmittingExtension}
+              >
+                <Icon name="x" size={18} />
+              </button>
+            </div>
+
+            {/* Danh sách các task được xin gia hạn */}
+            <div>
+              <label className="form-label" style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.3rem' }}>
+                Danh sách công việc áp dụng:
+              </label>
+              <div
+                style={{
+                  maxHeight: '120px',
+                  overflowY: 'auto',
+                  backgroundColor: 'var(--bg-surface-secondary)',
+                  padding: '0.65rem 0.85rem',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-color)',
+                  fontSize: '0.8125rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.4rem',
+                }}
+              >
+                {eligibleSelectedTasks.map((t) => (
+                  <div key={t.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                    <span style={{ fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      • {t.title}
+                    </span>
+                    <span style={{ fontSize: '0.725rem', color: 'var(--text-muted)', flexShrink: 0 }}>
+                      Hạn: {formatDate(t.dueDate)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {extensionError && (
+              <div
+                style={{
+                  color: 'var(--priority-high)',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  padding: '0.5rem 0.75rem',
+                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                  borderRadius: 'var(--radius-md)',
+                }}
+              >
+                {extensionError}
+              </div>
+            )}
+
+            {/* Form inputs */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label" style={{ fontSize: '0.8125rem', fontWeight: 600, marginBottom: '0.25rem' }}>
+                  Hạn chót đề xuất mới <span style={{ color: 'var(--priority-high)' }}>*</span>
+                </label>
+                <input
+                  type="date"
+                  className="form-input"
+                  value={extensionNewDueDate}
+                  onChange={(e) => {
+                    setExtensionNewDueDate(e.target.value);
+                    if (extensionError) setExtensionError('');
+                  }}
+                  disabled={isSubmittingExtension}
+                  style={{ fontSize: '0.85rem' }}
+                />
+              </div>
+
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label" style={{ fontSize: '0.8125rem', fontWeight: 600, marginBottom: '0.25rem' }}>
+                  Lý do xin gia hạn <span style={{ color: 'var(--priority-high)' }}>*</span>
+                </label>
+                <textarea
+                  className="form-input"
+                  rows={3}
+                  placeholder="Nêu rõ lý do cần thêm thời gian (khối lượng phát sinh, trở ngại kỹ thuật...)"
+                  value={extensionReason}
+                  onChange={(e) => {
+                    setExtensionReason(e.target.value);
+                    if (extensionError) setExtensionError('');
+                  }}
+                  disabled={isSubmittingExtension}
+                  style={{ fontSize: '0.85rem', resize: 'vertical' }}
+                />
+              </div>
+            </div>
+
+            {/* Modal Footer actions */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setIsExtensionModalOpen(false)}
+                disabled={isSubmittingExtension}
+              >
+                Hủy bỏ
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                isLoading={isSubmittingExtension}
+                onClick={handleSubmitBulkExtension}
+                style={{ backgroundColor: '#d97706', borderColor: '#d97706' }}
+              >
+                Gửi yêu cầu gia hạn
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Confirm Modal khi bấm nút Xóa */}
       <ConfirmModal
         isOpen={deletingTask !== null}
@@ -395,3 +744,4 @@ export const TaskList: React.FC<TaskListProps> = ({
     </div>
   );
 };
+

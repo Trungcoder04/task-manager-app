@@ -167,9 +167,11 @@ export const BoardPage: React.FC<BoardPageProps> = ({
       ) : (
         <TaskList
           tasks={filteredTasks}
+          currentUserId={currentUserId}
           onSelectTask={handleSelectTask}
           onMoveTask={onMoveTask}
           onDeleteTask={onDeleteTask}
+          onRequestExtension={onRequestExtension}
         />
       )}
 
